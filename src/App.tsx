@@ -207,6 +207,7 @@ export default function App() {
   const [alertHistory, setAlertHistory] = useState<AlertHistoryItem[]>([]);
   const [activeToasts, setActiveToasts] = useState<AlertNotification[]>([]);
   const [triggeredCountToday, setTriggeredCountToday] = useState(0);
+  const [actionToast, setActionToast] = useState<{ id: string; message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
   // 5. Refresh Interval & Timing
   const [refreshInterval, setRefreshInterval] = useState<number>(() => {
@@ -479,91 +480,167 @@ export default function App() {
     }));
   };
 
+  const showActionToast = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
+    const id = `toast_${Date.now()}`;
+    setActionToast({ id, message, type });
+    setTimeout(() => {
+      setActionToast(curr => (curr?.id === id ? null : curr));
+    }, 4000);
+  };
+
   const handleDeleteStock = (symbol: string) => {
-    const symUpper = symbol.toUpperCase();
-    setStocks(prev => prev.filter(s => s.symbol !== symUpper));
-    // Persist deletion in SQLite
+    const symUpper = symbol.trim().toUpperCase();
+    if (!symUpper) return;
+
+    // 1. Permanent removal from React state
+    setStocks(prev => {
+      const filtered = prev.filter(s => s.symbol.toUpperCase() !== symUpper);
+      localStorage.setItem('sahm_watchlist', JSON.stringify(filtered));
+      return filtered;
+    });
+
+    // 2. Permanent deletion from SQLite database in backend
     apiService.deleteSqliteStock(symUpper);
+
+    // 3. Clear any active toast for that symbol
+    setActiveToasts(prev => prev.filter(t => t.symbol.toUpperCase() !== symUpper));
+
+    // 4. Show confirmation
+    const msg = lang === 'ar' 
+      ? `تم الحذف النهائي للسهم (${symUpper}) من المراقبة وقاعدة البيانات بنجاح`
+      : `Stock (${symUpper}) permanently deleted from watchlist and SQLite database`;
+    showActionToast(msg, 'info');
   };
 
   const handleClearAllStocks = () => {
-    for (const stock of stocks) {
-      apiService.deleteSqliteStock(stock.symbol);
-    }
     setStocks([]);
+    localStorage.setItem('sahm_watchlist', JSON.stringify([]));
+    setActiveToasts([]);
+    apiService.clearAllSqliteStocks();
+
+    const msg = lang === 'ar' 
+      ? 'تم الحذف النهائي لجميع الأسهم من المراقبة وقاعدة البيانات'
+      : 'All stocks permanently deleted from watchlist and SQLite database';
+    showActionToast(msg, 'info');
   };
 
   const handleAddStock = (symbol: string, upperAlert: number | null, lowerAlert: number | null) => {
-    const symUpper = symbol.toUpperCase();
-    const newStock: StockItem = {
-      symbol: symUpper,
-      companyName: symUpper,
-      sector: 'General',
-      price: 0,
-      change: 0,
-      changePercent: 0,
-      open: 0,
-      previousClose: 0,
-      dayHigh: 0,
-      dayLow: 0,
-      volume: 0,
-      upperAlert,
-      lowerAlert,
-      alertsEnabled: true,
-      lastUpdated: 0,
-    };
+    const symUpper = symbol.trim().toUpperCase();
+    if (!symUpper) return;
 
-    setStocks(prev => [newStock, ...prev.filter(s => s.symbol !== symUpper)]);
+    setStocks(prev => {
+      const existing = prev.find(s => s.symbol.toUpperCase() === symUpper);
+      const newStock: StockItem = {
+        symbol: symUpper,
+        companyName: existing?.companyName || symUpper,
+        sector: existing?.sector || 'General',
+        exchange: existing?.exchange || 'US',
+        price: existing?.price || 0,
+        change: existing?.change || 0,
+        changePercent: existing?.changePercent || 0,
+        open: existing?.open || 0,
+        previousClose: existing?.previousClose || 0,
+        dayHigh: existing?.dayHigh || 0,
+        dayLow: existing?.dayLow || 0,
+        volume: existing?.volume || 0,
+        upperAlert: upperAlert !== null ? upperAlert : (existing?.upperAlert ?? null),
+        lowerAlert: lowerAlert !== null ? lowerAlert : (existing?.lowerAlert ?? null),
+        alertsEnabled: true,
+        lastUpdated: 0,
+      };
 
-    // Persist to SQLite
-    apiService.saveSqliteStock({
-      symbol: symUpper,
-      name: symUpper,
-      sector: 'General',
-      upperAlert,
-      lowerAlert,
-      alertsEnabled: true,
+      // PREPEND: Put the new stock at the very TOP of the list, retaining ALL previous stocks
+      const otherStocks = prev.filter(s => s.symbol.toUpperCase() !== symUpper);
+      const updatedList = [newStock, ...otherStocks];
+
+      // Save to SQLite
+      apiService.saveSqliteStock({
+        symbol: symUpper,
+        name: newStock.companyName,
+        sector: newStock.sector,
+        exchange: newStock.exchange,
+        price: newStock.price,
+        upperAlert: newStock.upperAlert,
+        lowerAlert: newStock.lowerAlert,
+        alertsEnabled: true,
+      });
+
+      localStorage.setItem('sahm_watchlist', JSON.stringify(updatedList));
+      return updatedList;
     });
+
+    const msg = lang === 'ar'
+      ? `تمت إضافة السهم (${symUpper}) في أعلى القائمة مع الاحتفاظ بكافة الأسهم السابقة`
+      : `Stock (${symUpper}) added to top of watchlist. All previous stocks retained`;
+    showActionToast(msg, 'success');
 
     // Immediately trigger fetch for the new stock
     setTimeout(() => fetchMarketQuotes(), 100);
   };
 
   const handleImportStocks = (parsed: ParsedStockData[], filename: string) => {
-    const existingSymbols = new Set(stocks.map(s => s.symbol.toUpperCase()));
-    const newItems: StockItem[] = [];
+    if (!parsed || parsed.length === 0) return;
 
-    for (const p of parsed) {
-      if (!existingSymbols.has(p.symbol.toUpperCase())) {
-        newItems.push({
-          symbol: p.symbol.toUpperCase(),
-          companyName: p.companyName || p.symbol.toUpperCase(),
-          sector: p.sector || 'General',
-          industry: p.industry,
-          price: p.price || 0,
-          change: 0,
-          changePercent: 0,
-          open: 0,
-          previousClose: 0,
-          dayHigh: 0,
-          dayLow: 0,
-          volume: 0,
-          upperAlert: p.upperAlert ?? null,
-          lowerAlert: p.lowerAlert ?? null,
-          alertsEnabled: true,
-          lastUpdated: 0,
-        });
+    setStocks(prev => {
+      const existingMap = new Map<string, StockItem>(prev.map(s => [s.symbol.toUpperCase(), s]));
+      const newItems: StockItem[] = [];
+      let updatedCount = 0;
+
+      for (const p of parsed) {
+        const sym = p.symbol.trim().toUpperCase();
+        if (!sym) continue;
+
+        if (existingMap.has(sym)) {
+          // Update existing stock's alert levels if provided, while keeping live market stats
+          const old = existingMap.get(sym)!;
+          const updated: StockItem = {
+            ...old,
+            companyName: p.companyName || old.companyName,
+            sector: p.sector || old.sector,
+            upperAlert: p.upperAlert !== undefined && p.upperAlert !== null ? p.upperAlert : old.upperAlert,
+            lowerAlert: p.lowerAlert !== undefined && p.lowerAlert !== null ? p.lowerAlert : old.lowerAlert,
+          };
+          existingMap.set(sym, updated);
+          updatedCount++;
+        } else {
+          // New stock to be prepended on top
+          newItems.push({
+            symbol: sym,
+            companyName: p.companyName || sym,
+            sector: p.sector || 'General',
+            industry: p.industry,
+            price: p.price || 0,
+            change: 0,
+            changePercent: 0,
+            open: 0,
+            previousClose: 0,
+            dayHigh: 0,
+            dayLow: 0,
+            volume: 0,
+            upperAlert: p.upperAlert ?? null,
+            lowerAlert: p.lowerAlert ?? null,
+            alertsEnabled: true,
+            lastUpdated: 0,
+          });
+        }
       }
-    }
 
-    if (newItems.length > 0) {
-      setStocks(prev => [...newItems, ...prev]);
-      
-      // Persist in bulk to SQLite
-      apiService.bulkSaveSqliteStocks(newItems);
+      // PREPEND: Put all new items on top, retaining all previous stocks
+      const combined = [...newItems, ...Array.from(existingMap.values())];
 
-      setTimeout(() => fetchMarketQuotes(), 200);
-    }
+      // Bulk persist to SQLite
+      apiService.bulkSaveSqliteStocks(combined);
+      localStorage.setItem('sahm_watchlist', JSON.stringify(combined));
+
+      const msg = lang === 'ar'
+        ? `تم بنجاح استيراد ${newItems.length} سهم جديد في أعلى القائمة والاحتفاظ بـ ${existingMap.size} سهم سابق من (${filename})`
+        : `Successfully imported ${newItems.length} new stocks on top, retaining ${existingMap.size} previous stocks from (${filename})`;
+      showActionToast(msg, 'success');
+
+      return combined;
+    });
+
+    setTimeout(() => fetchMarketQuotes(), 200);
   };
 
   const handleTestTriggerAlert = (stock: StockItem) => {
@@ -743,6 +820,22 @@ export default function App() {
         stocks={stocks}
         lang={lang}
       />
+
+      {/* Floating Action Toast Banner */}
+      {actionToast && (
+        <div className="fixed bottom-12 left-1/2 -translate-x-1/2 z-50 animate-slide-in">
+          <div className="bg-[#161b22] border border-emerald-500/50 shadow-2xl rounded-xl px-4 py-2.5 flex items-center gap-3 text-white text-xs font-mono backdrop-blur-md">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>{actionToast.message}</span>
+            <button
+              onClick={() => setActionToast(null)}
+              className="p-1 rounded text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating Real-Time Crossing Notification Banners */}
       <AlertNotificationBanner

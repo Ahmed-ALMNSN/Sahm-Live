@@ -101,16 +101,34 @@ export class SqliteDatabase {
         date TEXT NOT NULL
       );
     `);
+    // Table: system_meta (to track seeding flags, settings)
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS system_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+    `);
   }
 
   private seedDefaultStocksIfEmpty(): void {
     if (!this.db) return;
 
+    // Check if initial seeding already took place previously
+    try {
+      const metaRes = this.db.exec(`SELECT value FROM system_meta WHERE key = 'has_seeded_initial';`);
+      const alreadySeeded = metaRes[0]?.values[0]?.[0] === '1';
+      if (alreadySeeded) {
+        return;
+      }
+    } catch {
+      // Table might have just been created
+    }
+
     const countRes = this.db.exec(`SELECT COUNT(*) as count FROM stocks;`);
     const count = countRes[0]?.values[0]?.[0] as number || 0;
 
     if (count === 0) {
-      console.log('[SQLite] Seeding initial stocks...');
+      console.log('[SQLite] First-time setup: Seeding initial stocks...');
       const defaultStocks: SqliteStock[] = [
         { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology', exchange: 'NASDAQ', upperAlert: 245.00, lowerAlert: 215.00, alertsEnabled: true },
         { symbol: 'MSFT', name: 'Microsoft Corporation', sector: 'Technology', exchange: 'NASDAQ', upperAlert: 430.00, lowerAlert: 390.00, alertsEnabled: true },
@@ -119,8 +137,6 @@ export class SqliteDatabase {
         { symbol: 'GOOGL', name: 'Alphabet Inc.', sector: 'Communication Services', exchange: 'NASDAQ', upperAlert: 190.00, lowerAlert: 160.00, alertsEnabled: true },
         { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Automotive & Clean Energy', exchange: 'NASDAQ', upperAlert: 260.00, lowerAlert: 190.00, alertsEnabled: true },
         { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Communication Services', exchange: 'NASDAQ', upperAlert: 600.00, lowerAlert: 510.00, alertsEnabled: true },
-        { symbol: 'SAUDI_ARAMCO', name: 'Saudi Aramco / أرامكو السعودية', sector: 'Energy & Oil', exchange: 'TADAWUL', upperAlert: 30.00, lowerAlert: 26.00, alertsEnabled: true },
-        { symbol: 'ALRAJHI', name: 'Al Rajhi Bank / مصرف الراجحي', sector: 'Financial Services', exchange: 'TADAWUL', upperAlert: 95.00, lowerAlert: 80.00, alertsEnabled: true },
       ];
 
       const now = Date.now();
@@ -144,6 +160,10 @@ export class SqliteDatabase {
         ]);
       }
       stmt.free();
+
+      // Mark seeding as permanently completed
+      this.db.run(`INSERT OR REPLACE INTO system_meta (key, value) VALUES ('has_seeded_initial', '1');`);
+      this.saveToDisk();
     }
   }
 

@@ -289,7 +289,7 @@ async function startServer() {
     }
   });
 
-  // Delete single stock from SQLite
+  // Delete single stock from SQLite (Permanent deletion)
   app.delete('/api/stocks/:symbol', (req: Request, res: Response) => {
     try {
       const symbol = req.params.symbol?.toUpperCase();
@@ -297,6 +297,16 @@ async function startServer() {
       res.json({ success, symbol });
     } catch (err: any) {
       res.status(500).json({ success: false, error: { code: 'SQLITE_DELETE_ERROR', message: err.message } });
+    }
+  });
+
+  // Delete all stocks from SQLite (Permanent deletion)
+  app.delete('/api/stocks', (req: Request, res: Response) => {
+    try {
+      const success = sqliteDb.clearAllStocks();
+      res.json({ success, message: 'All stocks permanently deleted from SQLite' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: { code: 'SQLITE_CLEAR_ERROR', message: err.message } });
     }
   });
 

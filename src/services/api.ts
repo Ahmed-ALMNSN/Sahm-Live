@@ -224,6 +224,18 @@ export class ApiService {
     }
   }
 
+  async clearAllSqliteStocks(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/stocks', {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('clearAllSqliteStocks error:', err);
+      return false;
+    }
+  }
+
   async fetchSqliteStatus(): Promise<any> {
     try {
       const res = await fetch('/api/sqlite/status');

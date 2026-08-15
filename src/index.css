@@ -6,33 +6,59 @@
     --font-mono: 'JetBrains Mono', monospace;
   }
 
-  html, body {
-    font-family: var(--font-cairo);
+  html.dark, html.dark body {
     background-color: #0a0b0d;
     color: #e2e8f0;
+  }
+
+  html:not(.dark), html:not(.dark) body {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  html, body {
+    font-family: var(--font-cairo);
     font-size: 15px;
     line-height: 1.6;
     letter-spacing: -0.01em;
+    min-height: 100vh;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   [dir="rtl"], [dir="ltr"] {
     font-family: var(--font-cairo);
   }
 
-  /* Technical Grid scrollbar */
-  ::-webkit-scrollbar {
+  /* Technical Grid scrollbar - Dark Mode */
+  html.dark ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  ::-webkit-scrollbar-track {
+  html.dark ::-webkit-scrollbar-track {
     background: #0a0b0d;
   }
-  ::-webkit-scrollbar-thumb {
+  html.dark ::-webkit-scrollbar-thumb {
     background: #27303f;
     border-radius: 4px;
   }
-  ::-webkit-scrollbar-thumb:hover {
+  html.dark ::-webkit-scrollbar-thumb:hover {
     background: #3b485d;
+  }
+
+  /* Technical Grid scrollbar - Light Mode */
+  html:not(.dark) ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  html:not(.dark) ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
   }
 }
 

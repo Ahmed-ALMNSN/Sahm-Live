@@ -252,8 +252,11 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
 
               {/* Tickers Preview Chips */}
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 font-mono">
-                  {t.uploadModal.previewTitle}
+                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 font-mono">
+                  <span>{t.uploadModal.previewTitle}</span>
+                  <span className="text-emerald-400 font-sans text-[11px] normal-case">
+                    {lang === 'ar' ? '✓ يُضاف في أعلى القائمة مع الاحتفاظ بالأسهم السابقة' : '✓ Added on top, retaining previous stocks'}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded bg-[#0a0b0d] border border-slate-800">
                   {parseResult.stocks.map((s) => (

@@ -1,0 +1,6 @@
+{
+  "name": "JMApps Live Stock Monitor",
+  "description": "JMApps - Live US stock monitoring, alerts, price crossing detection, Excel/CSV file upload, and real-time market dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

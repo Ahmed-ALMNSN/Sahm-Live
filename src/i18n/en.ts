@@ -42,7 +42,7 @@ export const en = {
     exportWatchlist: 'Export Watchlist',
     viewDetails: 'View Details & Analysis',
     deleteStock: 'Delete Stock',
-    deleteConfirm: 'Are you sure you want to delete this stock from SQLite and live monitoring?',
+    deleteConfirm: 'Are you sure you want to delete this stock from live monitoring?',
     editAlerts: 'Edit Alerts',
     save: 'Save',
     cancel: 'Cancel',
@@ -168,8 +168,8 @@ export const en = {
   },
   toast: {
     importedSuccess: 'Successfully loaded {count} stocks from {file}',
-    stockAdded: 'Stock {symbol} added to watchlist and SQLite database',
-    stockDeleted: 'Stock deleted from watchlist and SQLite database',
+    stockAdded: 'Stock {symbol} added to watchlist',
+    stockDeleted: 'Stock deleted from watchlist',
     alertsUpdated: 'Alert thresholds updated',
     historyCleared: 'Alert history cleared',
     errorFetch: 'Could not fetch data for some stocks. Will retry automatically.',
@@ -199,7 +199,7 @@ export const en = {
     lowerAlert: 'Lower Target',
     status: 'Alert Status',
     disclaimerTitle: 'Executive Compliance Notice',
-    disclaimerText: 'This report is generated for real-time tracking and portfolio observation. Data is cached and persisted via SQLite engine.',
+    disclaimerText: 'This report is generated for real-time tracking and portfolio observation. Data is cached and updated via live monitoring engine.',
     btnPrint: 'Print Report / Save PDF',
     btnClose: 'Close',
   }

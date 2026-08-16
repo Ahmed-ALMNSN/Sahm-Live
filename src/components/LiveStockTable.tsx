@@ -188,10 +188,10 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
   };
 
   return (
-    <div className="bg-[#161b22] rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col font-sans">
+    <div className="bg-white dark:bg-[#161b22] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col font-sans transition-colors duration-200">
       
       {/* Controls Bar: Search & Filter Tabs & Clear Options */}
-      <div className="p-4 border-b border-slate-800 flex flex-col lg:flex-row gap-3.5 justify-between items-stretch lg:items-center bg-[#161b22]">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row gap-3.5 justify-between items-stretch lg:items-center bg-white dark:bg-[#161b22] transition-colors duration-200">
         
         {/* Search Field */}
         <div className="relative w-full lg:w-80">
@@ -205,12 +205,12 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
               setCurrentPage(1);
             }}
             placeholder={t.actions.searchPlaceholder}
-            className="w-full pl-9 pr-8 rtl:pl-8 rtl:pr-9 py-2 rounded-xl text-sm bg-[#0a0b0d] border border-slate-700 text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-sans transition-all"
+            className="w-full pl-9 pr-8 rtl:pl-8 rtl:pr-9 py-2 rounded-xl text-sm bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 font-sans transition-all"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute top-1/2 -translate-y-1/2 right-3 rtl:right-auto rtl:left-3 text-xs text-slate-400 hover:text-white p-1"
+              className="absolute top-1/2 -translate-y-1/2 right-3 rtl:right-auto rtl:left-3 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-white p-1"
             >
               ✕
             </button>
@@ -229,16 +229,16 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
               }}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-2 font-sans ${
                 filterType === btn.type
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm'
-                  : 'bg-[#0a0b0d] text-slate-400 border border-slate-700 hover:border-slate-500 hover:text-slate-200'
+                  ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 dark:border-emerald-500/50 shadow-xs'
+                  : 'bg-slate-50 dark:bg-[#0a0b0d] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <span>{btn.label}</span>
               {btn.count !== undefined && (
                 <span className={`text-[11px] px-1.5 py-0.5 rounded font-mono font-bold ${
                   filterType === btn.type 
-                    ? 'bg-emerald-500/30 text-emerald-200' 
-                    : 'bg-slate-800 text-slate-400'
+                    ? 'bg-emerald-500/25 text-emerald-800 dark:text-emerald-200' 
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                 }`}>
                   {btn.count}
                 </span>
@@ -251,7 +251,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
             <button
               id="btn-clear-all-stocks"
               onClick={() => setIsConfirmingClearAll(true)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-all flex items-center gap-1.5 font-sans"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 transition-all flex items-center gap-1.5 font-sans"
               title={t.actions.clearAll}
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -265,81 +265,81 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
       {/* Main Stock Data Table */}
       <div className="overflow-x-auto relative scroll-smooth">
         {/* Mobile Horizontal Scroll Indicator Prompt */}
-        <div className="sm:hidden flex items-center justify-between px-3 py-1.5 bg-slate-900/80 text-[11px] text-slate-400 border-b border-slate-800 font-mono">
+        <div className="sm:hidden flex items-center justify-between px-3 py-1.5 bg-slate-100 dark:bg-slate-900/80 text-[11px] text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-mono">
           <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             {lang === 'ar' ? 'اسحب أفقياً لعرض كل البيانات' : 'Swipe horizontally for more columns'}
           </span>
-          <span className="text-slate-500">↔</span>
+          <span className="text-slate-400 dark:text-slate-500">↔</span>
         </div>
         
         <table className="w-full text-left rtl:text-right border-collapse min-w-[960px]">
           
           {/* Sticky Header */}
-          <thead className="bg-[#1a202c] text-xs font-bold text-slate-300 uppercase tracking-wider sticky top-0 z-10 border-b border-slate-700 font-sans">
+          <thead className="bg-slate-50 dark:bg-[#1a202c] text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider sticky top-0 z-10 border-b border-slate-200 dark:border-slate-700 font-sans transition-colors duration-200">
             <tr>
-              <th className="py-3.5 px-3 w-12 text-center text-rose-400" title={t.actions.deleteStock}>
+              <th className="py-3.5 px-3 w-12 text-center text-rose-500 dark:text-rose-400" title={t.actions.deleteStock}>
                 {t.actions.deleteStock}
               </th>
               
               <th className="py-3.5 px-3 w-12 text-center">{t.table.alerts}</th>
               
               <th 
-                className="py-3.5 px-3 cursor-pointer hover:text-emerald-400 transition-colors"
+                className="py-3.5 px-3 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 onClick={() => handleSort('symbol')}
               >
                 <div className="flex items-center gap-1.5">
                   <span>{t.table.ticker}</span>
-                  {sortField === 'symbol' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />)}
+                  {sortField === 'symbol' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />)}
                 </div>
               </th>
 
               <th 
-                className="py-3.5 px-3 cursor-pointer hover:text-emerald-400 transition-colors"
+                className="py-3.5 px-3 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 onClick={() => handleSort('companyName')}
               >
                 <div className="flex items-center gap-1.5">
                   <span>{t.table.company}</span>
-                  {sortField === 'companyName' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />)}
+                  {sortField === 'companyName' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />)}
                 </div>
               </th>
 
               <th className="py-3.5 px-3">{t.table.sector}</th>
 
               <th 
-                className="py-3.5 px-3 cursor-pointer hover:text-emerald-400 transition-colors"
+                className="py-3.5 px-3 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 onClick={() => handleSort('price')}
               >
                 <div className="flex items-center gap-1.5">
                   <span>{t.table.price}</span>
-                  {sortField === 'price' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />)}
+                  {sortField === 'price' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />)}
                 </div>
               </th>
 
               <th 
-                className="py-3.5 px-3 cursor-pointer hover:text-emerald-400 transition-colors"
+                className="py-3.5 px-3 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 onClick={() => handleSort('changePercent')}
               >
                 <div className="flex items-center gap-1.5">
                   <span>{t.table.changePercent}</span>
-                  {sortField === 'changePercent' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />)}
+                  {sortField === 'changePercent' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />)}
                 </div>
               </th>
 
               <th className="py-3.5 px-3">{t.table.dayRange}</th>
 
               <th 
-                className="py-3.5 px-3 cursor-pointer hover:text-emerald-400 transition-colors"
+                className="py-3.5 px-3 cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
                 onClick={() => handleSort('volume')}
               >
                 <div className="flex items-center gap-1.5">
                   <span>{t.table.volume}</span>
-                  {sortField === 'volume' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-400" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-400" />)}
+                  {sortField === 'volume' && (sortDirection === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-emerald-500" /> : <ArrowDown className="w-3.5 h-3.5 text-emerald-500" />)}
                 </div>
               </th>
 
               {/* Upper Alert Input Column */}
-              <th className="py-3.5 px-3 text-emerald-400">
+              <th className="py-3.5 px-3 text-emerald-600 dark:text-emerald-400">
                 <div className="flex items-center gap-1">
                   <span>{t.table.upperAlert}</span>
                   <span className="text-sm">↗</span>
@@ -347,7 +347,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
               </th>
 
               {/* Lower Alert Input Column */}
-              <th className="py-3.5 px-3 text-rose-400">
+              <th className="py-3.5 px-3 text-rose-600 dark:text-rose-400">
                 <div className="flex items-center gap-1">
                   <span>{t.table.lowerAlert}</span>
                   <span className="text-sm">↘</span>
@@ -360,14 +360,14 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-slate-800 text-sm">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
             {paginatedStocks.length === 0 ? (
               <tr>
-                <td colSpan={13} className="py-16 text-center text-slate-400">
+                <td colSpan={13} className="py-16 text-center text-slate-500 dark:text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-3">
-                    <SlidersHorizontal className="w-9 h-9 text-slate-500 opacity-60" />
-                    <p className="font-bold text-base text-slate-200 font-sans">{t.table.noStocks}</p>
-                    <p className="text-sm text-slate-400 max-w-md font-sans">{t.table.emptyListPrompt}</p>
+                    <SlidersHorizontal className="w-9 h-9 text-slate-400 dark:text-slate-500 opacity-60" />
+                    <p className="font-bold text-base text-slate-800 dark:text-slate-200 font-sans">{t.table.noStocks}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md font-sans">{t.table.emptyListPrompt}</p>
                   </div>
                 </td>
               </tr>
@@ -394,7 +394,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                   <tr 
                     key={stock.symbol}
                     id={`stock-row-${stock.symbol}`}
-                    className={`hover:bg-slate-800/50 transition-colors border-b border-slate-800 ${flashClass}`}
+                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800 ${flashClass}`}
                   >
                     
                     {/* Dedicated Delete Button (In front of each stock) */}
@@ -403,7 +403,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                         id={`btn-delete-stock-${stock.symbol}`}
                         onClick={() => setStockToDelete(stock.symbol)}
                         title={`${t.actions.deleteStock} ${stock.symbol}`}
-                        className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all active:scale-90"
+                        className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/30 transition-all active:scale-90"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -417,12 +417,12 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                         title={stock.alertsEnabled ? t.table.active : t.table.disabled}
                         className={`p-2 rounded-lg transition-all ${
                           stock.alertsEnabled
-                            ? 'bg-amber-400/15 text-amber-400 border border-amber-400/40 hover:bg-amber-400/25'
-                            : 'bg-[#0a0b0d] text-slate-500 hover:text-slate-300 border border-slate-800'
+                            ? 'bg-amber-400/15 text-amber-500 dark:text-amber-400 border border-amber-400/40 hover:bg-amber-400/25'
+                            : 'bg-slate-100 dark:bg-[#0a0b0d] text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-800'
                         }`}
                       >
                         {stock.alertsEnabled ? (
-                          <Bell className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          <Bell className="w-4 h-4 fill-amber-400 text-amber-500 dark:text-amber-400" />
                         ) : (
                           <BellOff className="w-4 h-4" />
                         )}
@@ -434,13 +434,13 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                       <div className="flex flex-col">
                         <button
                           onClick={() => onSelectStock(stock.symbol)}
-                          className="font-bold text-emerald-400 font-mono hover:text-emerald-300 text-left rtl:text-right flex items-center gap-1.5 group transition-colors tracking-wide text-sm sm:text-base"
+                          className="font-bold text-emerald-600 dark:text-emerald-400 font-mono hover:text-emerald-500 text-left rtl:text-right flex items-center gap-1.5 group transition-colors tracking-wide text-sm sm:text-base"
                         >
                           <span>{stock.symbol}</span>
                           <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </button>
                         {stock.exchange && (
-                          <span className="text-[11px] text-slate-400 uppercase tracking-wider font-mono">
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono">
                             {stock.exchange}
                           </span>
                         )}
@@ -450,7 +450,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                     {/* Company Name */}
                     <td className="py-3 px-3 max-w-[200px]">
                       <div className="flex flex-col truncate">
-                        <span className="font-sans font-medium text-slate-200 truncate text-sm" title={stock.companyName}>
+                        <span className="font-sans font-semibold text-slate-800 dark:text-slate-200 truncate text-sm" title={stock.companyName}>
                           {stock.companyName || stock.symbol}
                         </span>
                       </div>
@@ -458,14 +458,14 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
 
                     {/* Sector / Industry */}
                     <td className="py-3 px-3 max-w-[160px]">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-300 bg-slate-800/80 border border-slate-700/60 font-sans truncate" title={stock.sector}>
-                        <Building2 className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/60 font-sans truncate" title={stock.sector}>
+                        <Building2 className="w-3 h-3 text-slate-500 dark:text-slate-400 shrink-0" />
                         <span className="truncate">{stock.sector || 'General'}</span>
                       </span>
                     </td>
 
                     {/* Current Price */}
-                    <td className="py-3 px-3 font-mono font-bold text-white text-base">
+                    <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white text-base">
                       {stock.price > 0 ? `$${stock.price.toFixed(2)}` : (
                         <span className="text-sm text-slate-400 font-normal">Loading...</span>
                       )}
@@ -475,8 +475,8 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                     <td className="py-3 px-3 font-mono">
                       <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg font-bold text-xs sm:text-sm ${
                         isPositive 
-                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' 
-                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                          ? 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 dark:border-emerald-500/30' 
+                          : 'bg-rose-500/10 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/25 dark:border-rose-500/30'
                       }`}>
                         {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                         <span>{isPositive ? '+' : ''}{stock.changePercent.toFixed(2)}%</span>
@@ -487,19 +487,19 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                     </td>
 
                     {/* Day Range (High / Low) */}
-                    <td className="py-3 px-3 font-mono text-xs text-slate-300">
+                    <td className="py-3 px-3 font-mono text-xs text-slate-600 dark:text-slate-300">
                       {stock.dayHigh > 0 && stock.dayLow > 0 ? (
                         <div className="flex flex-col space-y-0.5">
-                          <span className="text-emerald-400 font-mono font-semibold">H: ${stock.dayHigh.toFixed(2)}</span>
-                          <span className="text-rose-400 font-mono font-semibold">L: ${stock.dayLow.toFixed(2)}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold">H: ${stock.dayHigh.toFixed(2)}</span>
+                          <span className="text-rose-600 dark:text-rose-400 font-mono font-semibold">L: ${stock.dayLow.toFixed(2)}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-500">-</span>
+                        <span className="text-slate-400 dark:text-slate-500">-</span>
                       )}
                     </td>
 
                     {/* Volume */}
-                    <td className="py-3 px-3 font-mono text-xs sm:text-sm text-slate-300 font-semibold">
+                    <td className="py-3 px-3 font-mono text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-semibold">
                       {formatVolume(stock.volume)}
                     </td>
 
@@ -514,7 +514,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           value={upperEditVal}
                           onChange={(e) => handleAlertInputChange(stock.symbol, 'upper', e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSaveAlerts(stock)}
-                          className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-[#0a0b0d] border border-slate-700 text-emerald-400 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all font-bold"
+                          className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400 placeholder-slate-400 focus:outline-none focus:border-emerald-500 transition-all font-bold"
                         />
                       </div>
                     </td>
@@ -530,7 +530,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           value={lowerEditVal}
                           onChange={(e) => handleAlertInputChange(stock.symbol, 'lower', e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleSaveAlerts(stock)}
-                          className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-[#0a0b0d] border border-slate-700 text-rose-400 placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-all font-bold"
+                          className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-slate-700 text-rose-600 dark:text-rose-400 placeholder-slate-400 focus:outline-none focus:border-rose-500 transition-all font-bold"
                         />
                       </div>
                     </td>
@@ -538,21 +538,21 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                     {/* Alert Status Indicator */}
                     <td className="py-3 px-3 text-center font-sans">
                       {stock.upperCrossedState ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500 text-black shadow-sm">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-emerald-500 text-white dark:text-black shadow-xs">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           <span>{t.table.crossedUpper}</span>
                         </span>
                       ) : stock.lowerCrossedState ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500 text-white shadow-sm">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-rose-500 text-white shadow-xs">
                           <AlertTriangle className="w-3.5 h-3.5" />
                           <span>{t.table.crossedLower}</span>
                         </span>
                       ) : stock.alertsEnabled && (stock.upperAlert !== null || stock.lowerAlert !== null) ? (
-                        <span className="text-xs font-semibold text-amber-400">
+                        <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
                           {t.table.normal}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-500 font-mono">-</span>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">-</span>
                       )}
                     </td>
 
@@ -577,7 +577,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           id={`btn-test-alert-${stock.symbol}`}
                           onClick={() => onTestTriggerAlert(stock)}
                           title={t.actions.testAlert}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         >
                           <Sparkles className="w-4 h-4" />
                         </button>
@@ -587,7 +587,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           id={`btn-view-${stock.symbol}`}
                           onClick={() => onSelectStock(stock.symbol)}
                           title={t.actions.viewDetails}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </button>
@@ -597,7 +597,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           id={`btn-quick-delete-${stock.symbol}`}
                           onClick={() => setStockToDelete(stock.symbol)}
                           title={t.actions.deleteStock}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -616,7 +616,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
 
       {/* Pagination Footer */}
       {filteredAndSortedStocks.length > pageSize && (
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between text-xs sm:text-sm text-slate-300 font-mono bg-[#161b22]">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-mono bg-slate-50 dark:bg-[#161b22] transition-colors duration-200">
           <div>
             {lang === 'ar' 
               ? `عرض ${(currentPage - 1) * pageSize + 1} إلى ${Math.min(currentPage * pageSize, filteredAndSortedStocks.length)} من أصل ${filteredAndSortedStocks.length} سهم`
@@ -629,18 +629,18 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
               id="btn-prev-page"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg border border-slate-700 bg-[#0a0b0d] disabled:opacity-30 hover:bg-slate-800 transition-all text-slate-300"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0a0b0d] disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-700 dark:text-slate-300"
             >
               <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
             </button>
-            <span className="font-bold text-slate-100 font-mono">
+            <span className="font-bold text-slate-800 dark:text-slate-100 font-mono">
               {currentPage} / {totalPages}
             </span>
             <button
               id="btn-next-page"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg border border-slate-700 bg-[#0a0b0d] disabled:opacity-30 hover:bg-slate-800 transition-all text-slate-300"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0a0b0d] disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-slate-700 dark:text-slate-300"
             >
               <ChevronRight className="w-4 h-4 rtl:rotate-180" />
             </button>
@@ -650,26 +650,26 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
 
       {/* Stock Delete Confirmation Modal */}
       {stockToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-200">
-            <div className="flex items-center gap-3 text-rose-400 mb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-3 text-rose-500 dark:text-rose-400 mb-3">
               <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <Trash2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white font-sans">{t.actions.deleteStock}</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white font-sans">{t.actions.deleteStock}</h3>
             </div>
             
-            <p className="text-sm text-slate-300 font-sans mb-6">
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-sans mb-6">
               {lang === 'ar' 
-                ? `هل أنت متأكد من حذف السهم (${stockToDelete}) من قائمة المراقبة وقاعدة بيانات SQLite؟`
-                : `Are you sure you want to delete (${stockToDelete}) from live monitoring and SQLite database?`
+                ? `هل أنت متأكد من حذف السهم (${stockToDelete}) نهائياً من قائمة المراقبة؟`
+                : `Are you sure you want to permanently remove (${stockToDelete}) from live monitoring?`
               }
             </p>
 
             <div className="flex items-center justify-end gap-3 font-sans">
               <button
                 onClick={() => setStockToDelete(null)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 {t.actions.cancel}
               </button>
@@ -687,26 +687,26 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
 
       {/* Clear All Confirmation Modal */}
       {isConfirmingClearAll && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-200">
-            <div className="flex items-center gap-3 text-rose-400 mb-3">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-3 text-rose-500 dark:text-rose-400 mb-3">
               <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
                 <AlertCircle className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white font-sans">{t.actions.clearAll}</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white font-sans">{t.actions.clearAll}</h3>
             </div>
             
-            <p className="text-sm text-slate-300 font-sans mb-6">
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-sans mb-6">
               {lang === 'ar' 
-                ? 'هل أنت متأكد من رغبتك في حذف جميع الأسهم المراقبة من قاعدة البيانات SQLite؟'
-                : 'Are you sure you want to delete ALL stocks from SQLite database and watchlist?'
+                ? 'هل أنت متأكد من رغبتك في حذف جميع الأسهم المراقبة نهائياً؟'
+                : 'Are you sure you want to delete ALL stocks from your watchlist?'
               }
             </p>
 
             <div className="flex items-center justify-end gap-3 font-sans">
               <button
                 onClick={() => setIsConfirmingClearAll(false)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
               >
                 {t.actions.cancel}
               </button>

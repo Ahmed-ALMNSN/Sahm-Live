@@ -30,20 +30,20 @@ export const AlertNotificationBanner: React.FC<AlertNotificationBannerProps> = (
           <div
             key={alert.id}
             id={`alert-toast-${alert.id}`}
-            className={`pointer-events-auto p-3.5 rounded-lg shadow-2xl bg-[#0f1115] text-white border border-slate-800 border-l-4 rtl:border-l-0 rtl:border-r-4 ${borderColor} transition-all duration-300 animate-slide-in font-mono`}
+            className={`pointer-events-auto p-3.5 rounded-lg shadow-2xl bg-white dark:bg-[#0f1115] text-slate-800 dark:text-white border border-slate-200 dark:border-slate-800 border-l-4 rtl:border-l-0 rtl:border-r-4 ${borderColor} transition-all duration-300 animate-slide-in font-mono`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
-                <div className={`p-1.5 rounded ${isUpper ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                <div className={`p-1.5 rounded ${isUpper ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'}`}>
                   {isUpper ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
                 </div>
                 <div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {t.alerts.notificationTitle}
                   </h4>
-                  <div className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                     <span>{alert.symbol}</span>
-                    <span className="text-[11px] font-normal text-slate-400">
+                    <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
                       {isUpper ? t.alerts.typeUpper : t.alerts.typeLower}
                     </span>
                   </div>
@@ -52,26 +52,26 @@ export const AlertNotificationBanner: React.FC<AlertNotificationBannerProps> = (
 
               <button
                 onClick={() => onDismiss(alert.id)}
-                className="p-1 text-slate-500 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="mt-2 text-xs space-y-0.5 text-slate-300">
+            <div className="mt-2 text-xs space-y-0.5 text-slate-600 dark:text-slate-300">
               <div className="flex justify-between">
-                <span className="text-slate-400">{t.alerts.currentPrice}</span>
-                <span className={`font-bold ${isUpper ? 'text-emerald-400' : 'text-rose-400'}`}>
+                <span className="text-slate-500 dark:text-slate-400">{t.alerts.currentPrice}</span>
+                <span className={`font-bold ${isUpper ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                   ${alert.triggeredPrice.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-slate-400 text-[11px]">
+              <div className="flex justify-between text-slate-500 dark:text-slate-400 text-[11px]">
                 <span>{t.alerts.targetLimit}</span>
                 <span>${alert.targetPrice.toFixed(2)}</span>
               </div>
             </div>
 
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-end gap-2">
+            <div className="mt-2.5 pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
               <button
                 onClick={() => {
                   onSelectStock(alert.symbol);

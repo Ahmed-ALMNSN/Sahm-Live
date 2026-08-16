@@ -507,8 +507,8 @@ export default function App() {
 
     // 4. Show confirmation
     const msg = lang === 'ar' 
-      ? `تم الحذف النهائي للسهم (${symUpper}) من المراقبة وقاعدة البيانات بنجاح`
-      : `Stock (${symUpper}) permanently deleted from watchlist and SQLite database`;
+      ? `تم الحذف النهائي للسهم (${symUpper}) من المراقبة بنجاح`
+      : `Stock (${symUpper}) permanently deleted from watchlist`;
     showActionToast(msg, 'info');
   };
 
@@ -519,8 +519,8 @@ export default function App() {
     apiService.clearAllSqliteStocks();
 
     const msg = lang === 'ar' 
-      ? 'تم الحذف النهائي لجميع الأسهم من المراقبة وقاعدة البيانات'
-      : 'All stocks permanently deleted from watchlist and SQLite database';
+      ? 'تم الحذف النهائي لجميع الأسهم من المراقبة بنجاح'
+      : 'All stocks permanently deleted from watchlist';
     showActionToast(msg, 'info');
   };
 
@@ -704,7 +704,7 @@ export default function App() {
   const selectedStock = stocks.find(s => s.symbol === selectedStockSymbol) || null;
 
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-slate-100 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#0a0b0d] text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       
       {/* Top Navigation Bar */}
       <Navbar
@@ -738,7 +738,7 @@ export default function App() {
           lang={lang}
         />
 
-        {/* Live Real-Time Stock Table with SQLite & Delete Options */}
+        {/* Live Real-Time Stock Table */}
         <LiveStockTable
           stocks={stocks}
           lang={lang}
@@ -752,25 +752,25 @@ export default function App() {
       </main>
 
       {/* Technical Dashboard Telemetry Footer */}
-      <footer className="min-h-9 py-2.5 bg-[#0a0b0d] border-t border-slate-800/80 flex flex-wrap items-center justify-between px-3 sm:px-6 lg:px-8 text-[11px] sm:text-xs text-slate-400 font-mono select-none gap-2 safe-bottom">
+      <footer className="min-h-9 py-2.5 bg-white dark:bg-[#0a0b0d] border-t border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between px-3 sm:px-6 lg:px-8 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono select-none gap-2 safe-bottom transition-colors duration-200">
         <div className="flex items-center flex-wrap gap-2.5 sm:gap-4">
-          <span className="flex items-center gap-1.5 font-bold text-slate-300">
+          <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-slate-400">ENGINE:</span> ONLINE (SQLite Active)
+            <span className="text-slate-500 dark:text-slate-400">ENGINE:</span> ONLINE (ACTIVE FEED)
           </span>
-          <span className="hidden sm:inline text-slate-600">•</span>
+          <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
           <span className="hidden sm:inline">
-            <span className="text-slate-400">FEED:</span> LIVE US EQUITIES
+            <span className="text-slate-500 dark:text-slate-400">FEED:</span> LIVE US EQUITIES
           </span>
-          <span className="hidden md:inline text-slate-600">•</span>
+          <span className="hidden md:inline text-slate-300 dark:text-slate-600">•</span>
           <span className="hidden md:inline">
-            <span className="text-slate-400">INTERVAL:</span> {refreshInterval / 1000}s
+            <span className="text-slate-500 dark:text-slate-400">INTERVAL:</span> {refreshInterval / 1000}s
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="font-semibold text-slate-300">SAHM LIVE MONITOR v2.5</span>
-          <span className="text-slate-600">•</span>
-          <span className="text-emerald-400 font-bold">200 OK</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM LIVE MONITOR v2.5</span>
+          <span className="text-slate-300 dark:text-slate-600">•</span>
+          <span className="text-emerald-600 dark:text-emerald-400 font-bold">200 OK</span>
         </div>
       </footer>
 

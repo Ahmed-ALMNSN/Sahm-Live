@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --font-cairo: 'Cairo', system-ui, -apple-system, sans-serif;
@@ -12,7 +14,7 @@
   }
 
   html:not(.dark), html:not(.dark) body {
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
     color: #0f172a;
   }
 

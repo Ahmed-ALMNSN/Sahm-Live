@@ -1,6 +1,7 @@
 import { MarketProvider } from '../providers/MarketProvider.js';
 import { YahooProvider } from '../providers/YahooProvider.js';
 import { FinnhubProvider } from '../providers/FinnhubProvider.js';
+import { YahooChartSource, StooqSource, CommunityOpenSource, MarketSource } from './MultiSourceEngine.js';
 import { StockQuote, ChartDataPoint, CompanyProfile } from '../types.js';
 
 interface CacheEntry<T> {
@@ -11,12 +12,16 @@ interface CacheEntry<T> {
 export class MarketService {
   private primaryProvider: MarketProvider;
   private fallbackProvider: MarketProvider;
+  private additionalSources: MarketSource[] = [
+    new YahooChartSource(),
+    new StooqSource(),
+    new CommunityOpenSource(),
+  ];
   private quoteCache = new Map<string, CacheEntry<StockQuote>>();
   private profileCache = new Map<string, CacheEntry<CompanyProfile>>();
   private chartCache = new Map<string, CacheEntry<ChartDataPoint[]>>();
-  private inFlightBatches = new Map<string, Promise<Record<string, StockQuote>>>();
 
-  private readonly QUOTE_TTL_MS = 4000; // 4 seconds cache to prevent excessive provider hits
+  private readonly QUOTE_TTL_MS = 3000; // 3 seconds cache
   private readonly PROFILE_TTL_MS = 300000; // 5 minutes cache
   private readonly CHART_TTL_MS = 60000; // 1 minute cache
 
@@ -42,7 +47,7 @@ export class MarketService {
 
     // Check cache
     const cached = this.quoteCache.get(cleanSym);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > Date.now() && cached.data.price > 0) {
       return cached.data;
     }
 
@@ -50,6 +55,9 @@ export class MarketService {
     return quotes[cleanSym] || null;
   }
 
+  /**
+   * Fetch quotes from multiple live market sources simultaneously
+   */
   async getQuotes(symbols: string[]): Promise<Record<string, StockQuote>> {
     const cleanSymbols = Array.from(
       new Set(
@@ -57,7 +65,7 @@ export class MarketService {
           .map(s => (s || '').trim().toUpperCase())
           .filter(s => s.length > 0 && /^[A-Z0-9.\-=]+$/.test(s))
       )
-    ).slice(0, 100); // Enforce max 100 symbols per request
+    ).slice(0, 100);
 
     if (cleanSymbols.length === 0) return {};
 
@@ -68,7 +76,7 @@ export class MarketService {
     const now = Date.now();
     for (const sym of cleanSymbols) {
       const cached = this.quoteCache.get(sym);
-      if (cached && cached.expiresAt > now) {
+      if (cached && cached.expiresAt > now && cached.data.price > 0) {
         results[sym] = cached.data;
       } else {
         symbolsToFetch.push(sym);
@@ -79,11 +87,11 @@ export class MarketService {
       return results;
     }
 
-    // Try primary provider
+    // 1. First Pass: Try Yahoo batch provider
     try {
       const fetched = await this.primaryProvider.getQuotes(symbolsToFetch);
       for (const [sym, quote] of Object.entries(fetched)) {
-        if (quote) {
+        if (quote && quote.price > 0) {
           results[sym] = quote;
           this.quoteCache.set(sym, { data: quote, expiresAt: now + this.QUOTE_TTL_MS });
         }
@@ -92,20 +100,34 @@ export class MarketService {
       console.warn(`Primary provider (${this.primaryProvider.name}) failed:`, err);
     }
 
-    // Identify missing symbols for fallback
-    const missing = symbolsToFetch.filter(sym => !results[sym]);
-    if (missing.length > 0 && (await this.fallbackProvider.isAvailable())) {
-      try {
-        const fallbackQuotes = await this.fallbackProvider.getQuotes(missing);
-        for (const [sym, quote] of Object.entries(fallbackQuotes)) {
-          if (quote) {
-            results[sym] = quote;
-            this.quoteCache.set(sym, { data: quote, expiresAt: now + this.QUOTE_TTL_MS });
+    // 2. Second Pass for any remaining/missing symbols: Race across all alternative market sources
+    const missing = symbolsToFetch.filter(sym => !results[sym] || results[sym].price === 0);
+    if (missing.length > 0) {
+      await Promise.all(
+        missing.map(async (sym) => {
+          try {
+            // Query all extra providers in parallel and pick the first non-null quote with price > 0
+            const quotePromises = this.additionalSources.map(source => 
+              source.fetchQuote(sym).catch(() => null)
+            );
+
+            // If Finnhub is configured, include it in the race
+            if (await this.fallbackProvider.isAvailable()) {
+              quotePromises.push(this.fallbackProvider.getQuote(sym).catch(() => null));
+            }
+
+            const candidates = await Promise.all(quotePromises);
+            const validQuote = candidates.find(q => q !== null && q.price > 0);
+
+            if (validQuote) {
+              results[sym] = validQuote;
+              this.quoteCache.set(sym, { data: validQuote, expiresAt: now + this.QUOTE_TTL_MS });
+            }
+          } catch (err) {
+            console.warn(`Multi-source resolution error for ${sym}:`, err);
           }
-        }
-      } catch (err) {
-        console.warn(`Fallback provider (${this.fallbackProvider.name}) failed:`, err);
-      }
+        })
+      );
     }
 
     return results;

@@ -4,21 +4,16 @@ import { StockQuote, ChartDataPoint, CompanyProfile } from '../types.js';
 export class YahooProvider implements MarketProvider {
   readonly name = 'Yahoo Finance';
   private headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.9',
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-site',
   };
 
   async isAvailable(): Promise<boolean> {
-    try {
-      const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=1d&interval=1d', {
-        headers: this.headers,
-        signal: AbortSignal.timeout(4000),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return true;
   }
 
   async getQuote(symbol: string): Promise<StockQuote | null> {
@@ -31,68 +26,83 @@ export class YahooProvider implements MarketProvider {
     const cleanSymbols = symbols.map(s => s.trim().toUpperCase()).filter(Boolean);
     const results: Record<string, StockQuote> = {};
 
-    // Batch in chunks of up to 50 symbols for reliable Yahoo response
-    const chunkSize = 50;
+    // 1. Try v7/finance/quote batch endpoint
+    const chunkSize = 25;
     for (let i = 0; i < cleanSymbols.length; i += chunkSize) {
       const chunk = cleanSymbols.slice(i, i + chunkSize);
       const symbolQuery = chunk.join(',');
 
       try {
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}`;
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=symbol,regularMarketPrice,regularMarketPreviousClose,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,marketCap,trailingPE,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName,fullExchangeName,exchange,currency,marketState,regularMarketTime`;
         const res = await fetch(url, {
           headers: this.headers,
-          signal: AbortSignal.timeout(7000),
+          signal: AbortSignal.timeout(6000),
         });
 
         if (res.ok) {
           const data: any = await res.json();
           const quotesList = data?.quoteResponse?.result || [];
           for (const q of quotesList) {
-            const sym = q.symbol.toUpperCase();
+            const sym = (q.symbol || '').toUpperCase();
+            if (!sym) continue;
             const price = Number(q.regularMarketPrice ?? q.postMarketPrice ?? q.preMarketPrice ?? 0);
-            const prevClose = Number(q.regularMarketPreviousClose ?? price);
-            const change = Number(q.regularMarketChange ?? (price - prevClose));
-            const changePercent = Number(q.regularMarketChangePercent ?? (prevClose ? (change / prevClose) * 100 : 0));
+            if (price > 0) {
+              const prevClose = Number(q.regularMarketPreviousClose ?? price);
+              const change = Number(q.regularMarketChange ?? (price - prevClose));
+              const changePercent = Number(q.regularMarketChangePercent ?? (prevClose ? (change / prevClose) * 100 : 0));
 
-            results[sym] = {
-              symbol: sym,
-              price: Number(price.toFixed(2)),
-              change: Number(change.toFixed(2)),
-              changePercent: Number(changePercent.toFixed(2)),
-              open: Number((q.regularMarketOpen ?? price).toFixed(2)),
-              previousClose: Number(prevClose.toFixed(2)),
-              high: Number((q.regularMarketDayHigh ?? price).toFixed(2)),
-              low: Number((q.regularMarketDayLow ?? price).toFixed(2)),
-              volume: Number(q.regularMarketVolume ?? 0),
-              marketCap: q.marketCap,
-              peRatio: q.trailingPE,
-              fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
-              fiftyTwoWeekLow: q.fiftyTwoWeekLow,
-              companyName: q.shortName || q.longName || sym,
-              exchange: q.fullExchangeName || q.exchange,
-              currency: q.currency || 'USD',
-              marketState: q.marketState || 'REGULAR',
-              provider: this.name,
-              timestamp: (q.regularMarketTime ? q.regularMarketTime * 1000 : Date.now()),
-            };
+              results[sym] = {
+                symbol: sym,
+                price: Number(price.toFixed(2)),
+                change: Number(change.toFixed(2)),
+                changePercent: Number(changePercent.toFixed(2)),
+                open: Number((q.regularMarketOpen ?? price).toFixed(2)),
+                previousClose: Number(prevClose.toFixed(2)),
+                high: Number((q.regularMarketDayHigh ?? price).toFixed(2)),
+                low: Number((q.regularMarketDayLow ?? price).toFixed(2)),
+                volume: Number(q.regularMarketVolume ?? 0),
+                marketCap: q.marketCap,
+                peRatio: q.trailingPE,
+                fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
+                fiftyTwoWeekLow: q.fiftyTwoWeekLow,
+                companyName: q.shortName || q.longName || sym,
+                exchange: q.fullExchangeName || q.exchange || 'US',
+                currency: q.currency || 'USD',
+                marketState: q.marketState || 'REGULAR',
+                provider: this.name,
+                timestamp: (q.regularMarketTime ? q.regularMarketTime * 1000 : Date.now()),
+              };
+            }
           }
         }
       } catch (err) {
-        console.warn(`YahooProvider v7 quote fetch failed for chunk ${symbolQuery}:`, err);
+        console.warn(`YahooProvider quote batch failed for chunk ${symbolQuery}:`, err);
       }
 
-      // If any symbols in chunk were missed (e.g. quote endpoint filtered or missed), fallback to chart endpoint per missed symbol
-      const missed = chunk.filter(sym => !results[sym]);
+      // Check if any symbols in chunk were missed, fetch from Chart endpoint
+      const missed = chunk.filter(sym => !results[sym] || results[sym].price === 0);
       if (missed.length > 0) {
         await Promise.all(
           missed.map(async (sym) => {
             try {
               const quote = await this.getQuoteFromChart(sym);
-              if (quote) {
+              if (quote && quote.price > 0) {
                 results[sym] = quote;
+              } else {
+                // Secondary fallback: query2 finance chart
+                const quoteQ2 = await this.getQuoteFromChartQ2(sym);
+                if (quoteQ2 && quoteQ2.price > 0) {
+                  results[sym] = quoteQ2;
+                } else {
+                  // Tertiary fallback: Stooq public finance
+                  const quoteStooq = await this.getQuoteFromStooq(sym);
+                  if (quoteStooq && quoteStooq.price > 0) {
+                    results[sym] = quoteStooq;
+                  }
+                }
               }
             } catch {
-              // Ignore single failure
+              // ignore
             }
           })
         );
@@ -104,7 +114,7 @@ export class YahooProvider implements MarketProvider {
 
   private async getQuoteFromChart(symbol: string): Promise<StockQuote | null> {
     try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=5m`;
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m&includePrePost=true`;
       const res = await fetch(url, {
         headers: this.headers,
         signal: AbortSignal.timeout(5000),
@@ -115,7 +125,9 @@ export class YahooProvider implements MarketProvider {
       const meta = data?.chart?.result?.[0]?.meta;
       if (!meta) return null;
 
-      const price = Number(meta.regularMarketPrice ?? 0);
+      const price = Number(meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0);
+      if (price <= 0) return null;
+
       const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
       const change = Number((price - prevClose).toFixed(2));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
@@ -131,11 +143,97 @@ export class YahooProvider implements MarketProvider {
         low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
         volume: Number(meta.regularMarketVolume ?? 0),
         companyName: meta.shortName || meta.symbol || symbol,
-        exchange: meta.exchangeName,
+        exchange: meta.exchangeName || 'US',
         currency: meta.currency || 'USD',
         provider: this.name,
         timestamp: meta.regularMarketTime ? meta.regularMarketTime * 1000 : Date.now(),
       };
+    } catch {
+      return null;
+    }
+  }
+
+  private async getQuoteFromChartQ2(symbol: string): Promise<StockQuote | null> {
+    try {
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`;
+      const res = await fetch(url, {
+        headers: this.headers,
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!res.ok) return null;
+      const data: any = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta) return null;
+
+      const price = Number(meta.regularMarketPrice ?? 0);
+      if (price <= 0) return null;
+
+      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
+      const change = Number((price - prevClose).toFixed(2));
+      const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
+
+      return {
+        symbol: symbol.toUpperCase(),
+        price: Number(price.toFixed(2)),
+        change,
+        changePercent,
+        open: Number((meta.regularMarketOpen ?? price).toFixed(2)),
+        previousClose: Number(prevClose.toFixed(2)),
+        high: Number((meta.regularMarketDayHigh ?? price).toFixed(2)),
+        low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
+        volume: Number(meta.regularMarketVolume ?? 0),
+        companyName: meta.shortName || meta.symbol || symbol,
+        exchange: meta.exchangeName || 'US',
+        currency: meta.currency || 'USD',
+        provider: 'Yahoo (Query2)',
+        timestamp: meta.regularMarketTime ? meta.regularMarketTime * 1000 : Date.now(),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async getQuoteFromStooq(symbol: string): Promise<StockQuote | null> {
+    try {
+      const url = `https://stooq.com/q/l/?s=${encodeURIComponent(symbol.toLowerCase())}.us&f=sd2t2ohlcv&h&e=csv`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) return null;
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) return null;
+
+      const parts = lines[1].split(',');
+      // Symbol,Date,Time,Open,High,Low,Close,Volume
+      if (parts.length >= 7) {
+        const close = parseFloat(parts[6]);
+        const open = parseFloat(parts[3]) || close;
+        const high = parseFloat(parts[4]) || close;
+        const low = parseFloat(parts[5]) || close;
+        const vol = parseInt(parts[7], 10) || 0;
+
+        if (!isNaN(close) && close > 0) {
+          const change = Number((close - open).toFixed(2));
+          const changePercent = open ? Number(((change / open) * 100).toFixed(2)) : 0;
+          return {
+            symbol: symbol.toUpperCase(),
+            price: Number(close.toFixed(2)),
+            change,
+            changePercent,
+            open: Number(open.toFixed(2)),
+            previousClose: Number(open.toFixed(2)),
+            high: Number(high.toFixed(2)),
+            low: Number(low.toFixed(2)),
+            volume: vol,
+            companyName: symbol.toUpperCase(),
+            exchange: 'US',
+            currency: 'USD',
+            provider: 'Stooq Financial',
+            timestamp: Date.now(),
+          };
+        }
+      }
+      return null;
     } catch {
       return null;
     }

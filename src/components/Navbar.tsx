@@ -14,7 +14,9 @@ import {
   Activity,
   Printer,
   Clock,
-  Info
+  Info,
+  Save,
+  Check
 } from 'lucide-react';
 import { Language, Theme } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
@@ -38,6 +40,9 @@ interface NavbarProps {
   refreshInterval: number;
   onChangeRefreshInterval: (interval: number) => void;
   marketState?: 'PRE' | 'REGULAR' | 'POST' | 'CLOSED';
+  onSaveAll: () => void;
+  hasUnsavedChanges: boolean;
+  isSaving: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -56,6 +61,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   isRefreshing,
   refreshInterval,
   onChangeRefreshInterval,
+  onSaveAll,
+  hasUnsavedChanges,
+  isSaving,
 }) => {
   const t = getTranslation(lang);
 
@@ -189,6 +197,37 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Action Tools & Controls */}
         <div className="flex items-center justify-between md:justify-end flex-wrap gap-2 sm:gap-3 lg:gap-3.5 overflow-x-auto no-scrollbar pb-1 md:pb-0 w-full md:w-auto mt-1 md:mt-0">
           
+          {/* Main Save / Commit Changes to Database Button */}
+          <button
+            id="btn-save-all-stocks"
+            onClick={onSaveAll}
+            disabled={isSaving}
+            title={hasUnsavedChanges ? t.actions.unsavedChanges : t.actions.saveTooltip}
+            className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all shadow-sm shrink-0 active:scale-95 cursor-pointer relative ${
+              hasUnsavedChanges
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-[#0f1115] shadow-md shadow-emerald-950/40 animate-pulse'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            {isSaving ? (
+              <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
+            ) : hasUnsavedChanges ? (
+              <Save className="w-4 h-4 text-emerald-100" />
+            ) : (
+              <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            )}
+            <span className="font-semibold">
+              {isSaving
+                ? t.actions.saving
+                : hasUnsavedChanges
+                ? t.actions.saveChanges
+                : t.actions.saved}
+            </span>
+            {hasUnsavedChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-300 animate-ping absolute -top-1 -right-1 rtl:-right-auto rtl:-left-1" />
+            )}
+          </button>
+
           {/* Print / Generate Stock Report Button */}
           <button
             id="btn-open-report"

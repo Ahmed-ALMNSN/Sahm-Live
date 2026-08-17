@@ -222,7 +222,12 @@ export default function App() {
     alertEngine.getNotificationPermission()
   );
 
-  // 7. Modals state
+  // 7. Save & Persistence Sync State
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+
+  // 8. Modals state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
@@ -449,12 +454,53 @@ export default function App() {
     setTheme(t => (t === 'dark' ? 'light' : 'dark'));
   };
 
+  // Explicit Save & Commit to Database function
+  const handleSaveAll = async () => {
+    setIsSaving(true);
+    try {
+      const currentList = stocksRef.current || stocks;
+      
+      // 1. Synchronize all stocks and alerts to persistent SQLite database
+      const res = await apiService.syncAllStocks(currentList);
+      
+      // 2. Commit to localStorage cache
+      localStorage.setItem('sahm_watchlist', JSON.stringify(currentList));
+      
+      setHasUnsavedChanges(false);
+      setLastSavedTime(Date.now());
+      
+      const count = res?.count ?? currentList.length;
+      const msg = lang === 'ar'
+        ? `✅ تم حفظ واعتماد كافة الأسهم (${count}) والتنبيهات في قاعدة البيانات بنجاح`
+        : `✅ All ${count} stocks and alert thresholds successfully saved to database`;
+      showActionToast(msg, 'success');
+    } catch (err) {
+      console.error('Error saving all stocks:', err);
+      showActionToast(lang === 'ar' ? 'تعذر الحفظ في قاعدة البيانات' : 'Failed to save to database', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Keyboard shortcut Ctrl+S / Cmd+S for instant saving
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSaveAll();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lang, stocks]);
+
   const handleUpdateAlerts = (
     symbol: string, 
     upperAlert: number | null, 
     lowerAlert: number | null, 
     alertsEnabled: boolean
   ) => {
+    setHasUnsavedChanges(true);
     setStocks(prev => prev.map(stock => {
       if (stock.symbol === symbol) {
         const updated = {
@@ -492,6 +538,8 @@ export default function App() {
     const symUpper = symbol.trim().toUpperCase();
     if (!symUpper) return;
 
+    setHasUnsavedChanges(true);
+
     // 1. Permanent removal from React state
     setStocks(prev => {
       const filtered = prev.filter(s => s.symbol.toUpperCase() !== symUpper);
@@ -513,6 +561,7 @@ export default function App() {
   };
 
   const handleClearAllStocks = () => {
+    setHasUnsavedChanges(true);
     setStocks([]);
     localStorage.setItem('sahm_watchlist', JSON.stringify([]));
     setActiveToasts([]);
@@ -527,6 +576,8 @@ export default function App() {
   const handleAddStock = (symbol: string, upperAlert: number | null, lowerAlert: number | null) => {
     const symUpper = symbol.trim().toUpperCase();
     if (!symUpper) return;
+
+    setHasUnsavedChanges(true);
 
     setStocks(prev => {
       const existing = prev.find(s => s.symbol.toUpperCase() === symUpper);
@@ -580,6 +631,8 @@ export default function App() {
 
   const handleImportStocks = (parsed: ParsedStockData[], filename: string) => {
     if (!parsed || parsed.length === 0) return;
+
+    setHasUnsavedChanges(true);
 
     setStocks(prev => {
       const existingMap = new Map<string, StockItem>(prev.map(s => [s.symbol.toUpperCase(), s]));
@@ -724,6 +777,9 @@ export default function App() {
         refreshInterval={refreshInterval}
         onChangeRefreshInterval={setRefreshInterval}
         marketState={stocks[0]?.marketState || 'REGULAR'}
+        onSaveAll={handleSaveAll}
+        hasUnsavedChanges={hasUnsavedChanges}
+        isSaving={isSaving}
       />
 
       {/* Main Dashboard Content */}

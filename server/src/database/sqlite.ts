@@ -290,6 +290,46 @@ export class SqliteDatabase {
     }
   }
 
+  syncAllStocks(stocks: SqliteStock[]): { success: boolean; count: number; timestamp: number } {
+    if (!this.db) return { success: false, count: 0, timestamp: Date.now() };
+    try {
+      const now = Date.now();
+      // Clear existing records to ensure deletions/reorderings are accurately synchronized
+      this.db.run(`DELETE FROM stocks;`);
+
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO stocks (symbol, name, sector, exchange, price, upper_alert, lower_alert, alerts_enabled, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `);
+
+      let count = 0;
+      for (const s of stocks) {
+        if (s && s.symbol) {
+          stmt.run([
+            s.symbol.toUpperCase(),
+            s.name || s.symbol.toUpperCase(),
+            s.sector || 'General',
+            s.exchange || 'US',
+            s.price !== undefined ? Number(s.price) : 0,
+            s.upperAlert !== undefined && s.upperAlert !== null ? Number(s.upperAlert) : null,
+            s.lowerAlert !== undefined && s.lowerAlert !== null ? Number(s.lowerAlert) : null,
+            s.alertsEnabled !== undefined ? (s.alertsEnabled ? 1 : 0) : 1,
+            s.createdAt || now,
+            now
+          ]);
+          count++;
+        }
+      }
+      stmt.free();
+      this.saveToDisk();
+      console.log(`[SQLite] Successfully synced & committed ${count} stocks to persistent database`);
+      return { success: true, count, timestamp: now };
+    } catch (err) {
+      console.error('[SQLite] Error syncing all stocks:', err);
+      return { success: false, count: 0, timestamp: Date.now() };
+    }
+  }
+
   // --- Alert History Operations ---
 
   getAlertHistory(): AlertHistoryItem[] {

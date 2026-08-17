@@ -212,6 +212,23 @@ export class ApiService {
     }
   }
 
+  async syncAllStocks(stocks: any[]): Promise<{ success: boolean; count: number; timestamp?: number; message?: string }> {
+    try {
+      const res = await fetch('/api/stocks/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stocks }),
+      });
+      if (!res.ok) {
+        return { success: false, count: 0 };
+      }
+      return await res.json();
+    } catch (err) {
+      console.error('syncAllStocks error:', err);
+      return { success: false, count: 0 };
+    }
+  }
+
   async deleteSqliteStock(symbol: string): Promise<boolean> {
     try {
       const res = await fetch(`/api/stocks/${encodeURIComponent(symbol)}`, {

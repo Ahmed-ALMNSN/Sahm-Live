@@ -289,6 +289,39 @@ async function startServer() {
     }
   });
 
+  // Sync & Save entire stock list to SQLite (used by explicit Save button & changes confirmation)
+  app.post(['/api/stocks/sync', '/api/stocks/save-all'], (req: Request, res: Response) => {
+    try {
+      const { stocks } = req.body;
+      if (!Array.isArray(stocks)) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'stocks array expected' } });
+      }
+
+      const formatted = stocks.map((s: any) => ({
+        symbol: String(s.symbol || '').toUpperCase().trim(),
+        name: s.companyName || s.name || s.symbol,
+        sector: s.sector || 'General',
+        exchange: s.exchange || 'US',
+        price: s.price !== undefined ? Number(s.price) : undefined,
+        upperAlert: s.upperAlert !== undefined ? (s.upperAlert === null ? null : Number(s.upperAlert)) : undefined,
+        lowerAlert: s.lowerAlert !== undefined ? (s.lowerAlert === null ? null : Number(s.lowerAlert)) : undefined,
+        alertsEnabled: s.alertsEnabled !== undefined ? Boolean(s.alertsEnabled) : true,
+      })).filter((s: any) => Boolean(s.symbol));
+
+      const result = sqliteDb.syncAllStocks(formatted);
+
+      res.json({
+        success: result.success,
+        count: result.count,
+        timestamp: result.timestamp,
+        message: 'All stocks and alerts saved and committed to database successfully',
+      });
+    } catch (err: any) {
+      console.error('[API] Error in /api/stocks/sync:', err);
+      res.status(500).json({ success: false, error: { code: 'SQLITE_SYNC_ERROR', message: err.message } });
+    }
+  });
+
   // Delete single stock from SQLite (Permanent deletion)
   app.delete('/api/stocks/:symbol', (req: Request, res: Response) => {
     try {

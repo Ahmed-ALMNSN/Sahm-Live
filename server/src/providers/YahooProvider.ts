@@ -33,7 +33,38 @@ export class YahooProvider implements MarketProvider {
       const symbolQuery = chunk.join(',');
 
       try {
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=symbol,regularMarketPrice,regularMarketPreviousClose,regularMarketChange,regularMarketChangePercent,regularMarketOpen,regularMarketDayHigh,regularMarketDayLow,regularMarketVolume,marketCap,trailingPE,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName,fullExchangeName,exchange,currency,marketState,regularMarketTime`;
+        const fields = [
+          'symbol',
+          'regularMarketPrice',
+          'regularMarketPreviousClose',
+          'regularMarketChange',
+          'regularMarketChangePercent',
+          'regularMarketOpen',
+          'regularMarketDayHigh',
+          'regularMarketDayLow',
+          'regularMarketVolume',
+          'marketCap',
+          'trailingPE',
+          'fiftyTwoWeekHigh',
+          'fiftyTwoWeekLow',
+          'shortName',
+          'longName',
+          'fullExchangeName',
+          'exchange',
+          'currency',
+          'marketState',
+          'regularMarketTime',
+          'postMarketPrice',
+          'postMarketChange',
+          'postMarketChangePercent',
+          'postMarketTime',
+          'preMarketPrice',
+          'preMarketChange',
+          'preMarketChangePercent',
+          'preMarketTime',
+        ].join(',');
+
+        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=${fields}`;
         const res = await fetch(url, {
           headers: this.headers,
           signal: AbortSignal.timeout(6000),
@@ -45,21 +76,66 @@ export class YahooProvider implements MarketProvider {
           for (const q of quotesList) {
             const sym = (q.symbol || '').toUpperCase();
             if (!sym) continue;
-            const price = Number(q.regularMarketPrice ?? q.postMarketPrice ?? q.preMarketPrice ?? 0);
-            if (price > 0) {
-              const prevClose = Number(q.regularMarketPreviousClose ?? price);
-              const change = Number(q.regularMarketChange ?? (price - prevClose));
-              const changePercent = Number(q.regularMarketChangePercent ?? (prevClose ? (change / prevClose) * 100 : 0));
 
+            const regPrice = Number(q.regularMarketPrice ?? 0);
+            const postPrice = Number(q.postMarketPrice ?? 0);
+            const prePrice = Number(q.preMarketPrice ?? 0);
+            const prevClose = Number(q.regularMarketPreviousClose ?? (regPrice || postPrice || prePrice || 0));
+
+            const regTime = Number(q.regularMarketTime ?? 0) * 1000;
+            const postTime = Number(q.postMarketTime ?? 0) * 1000;
+            const preTime = Number(q.preMarketTime ?? 0) * 1000;
+
+            let price = regPrice;
+            let change = Number(q.regularMarketChange ?? 0);
+            let changePercent = Number(q.regularMarketChangePercent ?? 0);
+            let quoteTimestamp = regTime || Date.now();
+
+            // Check if post-market has newer activity or is currently active
+            if (postPrice > 0 && (postTime >= regTime || q.marketState === 'POST' || q.marketState === 'CLOSED')) {
+              price = postPrice;
+              if (q.postMarketChange !== undefined && q.postMarketChange !== null) {
+                change = Number(q.postMarketChange);
+              } else if (prevClose > 0) {
+                change = Number((price - prevClose).toFixed(4));
+              }
+              if (q.postMarketChangePercent !== undefined && q.postMarketChangePercent !== null) {
+                changePercent = Number(q.postMarketChangePercent);
+              } else if (prevClose > 0) {
+                changePercent = Number(((change / prevClose) * 100).toFixed(2));
+              }
+              if (postTime > 0) quoteTimestamp = postTime;
+            } else if (prePrice > 0 && (preTime >= regTime || q.marketState === 'PRE')) {
+              price = prePrice;
+              if (q.preMarketChange !== undefined && q.preMarketChange !== null) {
+                change = Number(q.preMarketChange);
+              } else if (prevClose > 0) {
+                change = Number((price - prevClose).toFixed(4));
+              }
+              if (q.preMarketChangePercent !== undefined && q.preMarketChangePercent !== null) {
+                changePercent = Number(q.preMarketChangePercent);
+              } else if (prevClose > 0) {
+                changePercent = Number(((change / prevClose) * 100).toFixed(2));
+              }
+              if (preTime > 0) quoteTimestamp = preTime;
+            } else if (!price || price <= 0) {
+              price = postPrice || prePrice || prevClose;
+              if (prevClose > 0 && price > 0) {
+                change = Number((price - prevClose).toFixed(4));
+                changePercent = Number(((change / prevClose) * 100).toFixed(2));
+              }
+            }
+
+            if (price > 0) {
               results[sym] = {
                 symbol: sym,
-                price: Number(price.toFixed(2)),
-                change: Number(change.toFixed(2)),
+                price: Number(price.toFixed(4)),
+                change: Number(change.toFixed(4)),
                 changePercent: Number(changePercent.toFixed(2)),
-                open: Number((q.regularMarketOpen ?? price).toFixed(2)),
-                previousClose: Number(prevClose.toFixed(2)),
-                high: Number((q.regularMarketDayHigh ?? price).toFixed(2)),
-                low: Number((q.regularMarketDayLow ?? price).toFixed(2)),
+                open: Number((q.regularMarketOpen ?? price).toFixed(4)),
+                previousClose: Number(prevClose.toFixed(4)),
+                high: Number((q.regularMarketDayHigh ?? price).toFixed(4)),
+                low: Number((q.regularMarketDayLow ?? price).toFixed(4)),
                 volume: Number(q.regularMarketVolume ?? 0),
                 marketCap: q.marketCap,
                 peRatio: q.trailingPE,
@@ -70,7 +146,7 @@ export class YahooProvider implements MarketProvider {
                 currency: q.currency || 'USD',
                 marketState: q.marketState || 'REGULAR',
                 provider: this.name,
-                timestamp: (q.regularMarketTime ? q.regularMarketTime * 1000 : Date.now()),
+                timestamp: quoteTimestamp,
               };
             }
           }
@@ -122,25 +198,46 @@ export class YahooProvider implements MarketProvider {
 
       if (!res.ok) return null;
       const data: any = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
+      const chartResult = data?.chart?.result?.[0];
+      const meta = chartResult?.meta;
       if (!meta) return null;
 
-      const price = Number(meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0);
+      // Check last candle close from indicators
+      let latestCandlePrice = 0;
+      const closeArr = chartResult?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closeArr) && closeArr.length > 0) {
+        for (let idx = closeArr.length - 1; idx >= 0; idx--) {
+          const val = Number(closeArr[idx]);
+          if (!isNaN(val) && val > 0) {
+            latestCandlePrice = val;
+            break;
+          }
+        }
+      }
+
+      const postPrice = Number(meta.postMarketPrice ?? 0);
+      const prePrice = Number(meta.preMarketPrice ?? 0);
+      const regPrice = Number(meta.regularMarketPrice ?? 0);
+      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? (regPrice || latestCandlePrice || 0));
+
+      const price = latestCandlePrice > 0 
+        ? latestCandlePrice 
+        : (postPrice > 0 ? postPrice : (prePrice > 0 ? prePrice : (regPrice > 0 ? regPrice : prevClose)));
+
       if (price <= 0) return null;
 
-      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
-      const change = Number((price - prevClose).toFixed(2));
+      const change = Number((price - prevClose).toFixed(4));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
 
       return {
         symbol: symbol.toUpperCase(),
-        price: Number(price.toFixed(2)),
+        price: Number(price.toFixed(4)),
         change,
         changePercent,
-        open: Number((meta.regularMarketOpen ?? price).toFixed(2)),
-        previousClose: Number(prevClose.toFixed(2)),
-        high: Number((meta.regularMarketDayHigh ?? price).toFixed(2)),
-        low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
+        open: Number((meta.regularMarketOpen ?? price).toFixed(4)),
+        previousClose: Number(prevClose.toFixed(4)),
+        high: Number((meta.regularMarketDayHigh ?? price).toFixed(4)),
+        low: Number((meta.regularMarketDayLow ?? price).toFixed(4)),
         volume: Number(meta.regularMarketVolume ?? 0),
         companyName: meta.shortName || meta.symbol || symbol,
         exchange: meta.exchangeName || 'US',
@@ -155,7 +252,7 @@ export class YahooProvider implements MarketProvider {
 
   private async getQuoteFromChartQ2(symbol: string): Promise<StockQuote | null> {
     try {
-      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m`;
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1m&includePrePost=true`;
       const res = await fetch(url, {
         headers: this.headers,
         signal: AbortSignal.timeout(5000),
@@ -163,25 +260,45 @@ export class YahooProvider implements MarketProvider {
 
       if (!res.ok) return null;
       const data: any = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
+      const chartResult = data?.chart?.result?.[0];
+      const meta = chartResult?.meta;
       if (!meta) return null;
 
-      const price = Number(meta.regularMarketPrice ?? 0);
+      let latestCandlePrice = 0;
+      const closeArr = chartResult?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closeArr) && closeArr.length > 0) {
+        for (let idx = closeArr.length - 1; idx >= 0; idx--) {
+          const val = Number(closeArr[idx]);
+          if (!isNaN(val) && val > 0) {
+            latestCandlePrice = val;
+            break;
+          }
+        }
+      }
+
+      const postPrice = Number(meta.postMarketPrice ?? 0);
+      const prePrice = Number(meta.preMarketPrice ?? 0);
+      const regPrice = Number(meta.regularMarketPrice ?? 0);
+      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? (regPrice || latestCandlePrice || 0));
+
+      const price = latestCandlePrice > 0 
+        ? latestCandlePrice 
+        : (postPrice > 0 ? postPrice : (prePrice > 0 ? prePrice : (regPrice > 0 ? regPrice : prevClose)));
+
       if (price <= 0) return null;
 
-      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
-      const change = Number((price - prevClose).toFixed(2));
+      const change = Number((price - prevClose).toFixed(4));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
 
       return {
         symbol: symbol.toUpperCase(),
-        price: Number(price.toFixed(2)),
+        price: Number(price.toFixed(4)),
         change,
         changePercent,
-        open: Number((meta.regularMarketOpen ?? price).toFixed(2)),
-        previousClose: Number(prevClose.toFixed(2)),
-        high: Number((meta.regularMarketDayHigh ?? price).toFixed(2)),
-        low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
+        open: Number((meta.regularMarketOpen ?? price).toFixed(4)),
+        previousClose: Number(prevClose.toFixed(4)),
+        high: Number((meta.regularMarketDayHigh ?? price).toFixed(4)),
+        low: Number((meta.regularMarketDayLow ?? price).toFixed(4)),
         volume: Number(meta.regularMarketVolume ?? 0),
         companyName: meta.shortName || meta.symbol || symbol,
         exchange: meta.exchangeName || 'US',

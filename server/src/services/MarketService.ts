@@ -21,7 +21,7 @@ export class MarketService {
   private profileCache = new Map<string, CacheEntry<CompanyProfile>>();
   private chartCache = new Map<string, CacheEntry<ChartDataPoint[]>>();
 
-  private readonly QUOTE_TTL_MS = 3000; // 3 seconds cache
+  private readonly QUOTE_TTL_MS = 1000; // 1 second cache for instant realtime updates
   private readonly PROFILE_TTL_MS = 300000; // 5 minutes cache
   private readonly CHART_TTL_MS = 60000; // 1 minute cache
 

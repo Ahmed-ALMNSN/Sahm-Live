@@ -26,25 +26,45 @@ export class YahooChartSource implements MarketSource {
 
       if (!res.ok) return null;
       const data: any = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
+      const chartResult = data?.chart?.result?.[0];
+      const meta = chartResult?.meta;
       if (!meta) return null;
 
-      const price = Number(meta.regularMarketPrice ?? meta.chartPreviousClose ?? 0);
+      let latestCandlePrice = 0;
+      const closeArr = chartResult?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closeArr) && closeArr.length > 0) {
+        for (let idx = closeArr.length - 1; idx >= 0; idx--) {
+          const val = Number(closeArr[idx]);
+          if (!isNaN(val) && val > 0) {
+            latestCandlePrice = val;
+            break;
+          }
+        }
+      }
+
+      const postPrice = Number(meta.postMarketPrice ?? 0);
+      const prePrice = Number(meta.preMarketPrice ?? 0);
+      const regPrice = Number(meta.regularMarketPrice ?? 0);
+      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? (regPrice || latestCandlePrice || 0));
+
+      const price = latestCandlePrice > 0 
+        ? latestCandlePrice 
+        : (postPrice > 0 ? postPrice : (prePrice > 0 ? prePrice : (regPrice > 0 ? regPrice : prevClose)));
+
       if (price <= 0) return null;
 
-      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
-      const change = Number((price - prevClose).toFixed(2));
+      const change = Number((price - prevClose).toFixed(4));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
 
       return {
         symbol: sym,
-        price: Number(price.toFixed(2)),
+        price: Number(price.toFixed(4)),
         change,
         changePercent,
-        open: Number((meta.regularMarketOpen ?? price).toFixed(2)),
-        previousClose: Number(prevClose.toFixed(2)),
-        high: Number((meta.regularMarketDayHigh ?? price).toFixed(2)),
-        low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
+        open: Number((meta.regularMarketOpen ?? price).toFixed(4)),
+        previousClose: Number(prevClose.toFixed(4)),
+        high: Number((meta.regularMarketDayHigh ?? price).toFixed(4)),
+        low: Number((meta.regularMarketDayLow ?? price).toFixed(4)),
         volume: Number(meta.regularMarketVolume ?? 0),
         companyName: meta.shortName || meta.symbol || sym,
         exchange: meta.exchangeName || 'US',
@@ -141,8 +161,7 @@ export class CommunityOpenSource implements MarketSource {
   async fetchQuote(symbol: string): Promise<StockQuote | null> {
     try {
       const sym = symbol.toUpperCase().trim();
-      // Try free quotes proxy
-      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m`;
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=1m&includePrePost=true`;
       const res = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -153,25 +172,45 @@ export class CommunityOpenSource implements MarketSource {
 
       if (!res.ok) return null;
       const data: any = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
+      const chartResult = data?.chart?.result?.[0];
+      const meta = chartResult?.meta;
       if (!meta) return null;
 
-      const price = Number(meta.regularMarketPrice ?? 0);
+      let latestCandlePrice = 0;
+      const closeArr = chartResult?.indicators?.quote?.[0]?.close;
+      if (Array.isArray(closeArr) && closeArr.length > 0) {
+        for (let idx = closeArr.length - 1; idx >= 0; idx--) {
+          const val = Number(closeArr[idx]);
+          if (!isNaN(val) && val > 0) {
+            latestCandlePrice = val;
+            break;
+          }
+        }
+      }
+
+      const postPrice = Number(meta.postMarketPrice ?? 0);
+      const prePrice = Number(meta.preMarketPrice ?? 0);
+      const regPrice = Number(meta.regularMarketPrice ?? 0);
+      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? (regPrice || latestCandlePrice || 0));
+
+      const price = latestCandlePrice > 0 
+        ? latestCandlePrice 
+        : (postPrice > 0 ? postPrice : (prePrice > 0 ? prePrice : (regPrice > 0 ? regPrice : prevClose)));
+
       if (price <= 0) return null;
 
-      const prevClose = Number(meta.chartPreviousClose ?? meta.previousClose ?? price);
-      const change = Number((price - prevClose).toFixed(2));
+      const change = Number((price - prevClose).toFixed(4));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
 
       return {
         symbol: sym,
-        price: Number(price.toFixed(2)),
+        price: Number(price.toFixed(4)),
         change,
         changePercent,
-        open: Number((meta.regularMarketOpen ?? price).toFixed(2)),
-        previousClose: Number(prevClose.toFixed(2)),
-        high: Number((meta.regularMarketDayHigh ?? price).toFixed(2)),
-        low: Number((meta.regularMarketDayLow ?? price).toFixed(2)),
+        open: Number((meta.regularMarketOpen ?? price).toFixed(4)),
+        previousClose: Number(prevClose.toFixed(4)),
+        high: Number((meta.regularMarketDayHigh ?? price).toFixed(4)),
+        low: Number((meta.regularMarketDayLow ?? price).toFixed(4)),
         volume: Number(meta.regularMarketVolume ?? 0),
         companyName: meta.shortName || meta.symbol || sym,
         exchange: meta.exchangeName || 'US',

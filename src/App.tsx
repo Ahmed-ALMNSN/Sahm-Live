@@ -209,10 +209,10 @@ export default function App() {
   const [triggeredCountToday, setTriggeredCountToday] = useState(0);
   const [actionToast, setActionToast] = useState<{ id: string; message: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // 5. Refresh Interval & Timing
+  // 5. Refresh Interval & Timing (Default 2 seconds for high-frequency live monitoring)
   const [refreshInterval, setRefreshInterval] = useState<number>(() => {
     const saved = localStorage.getItem('sahm_refresh_interval');
-    return saved ? parseInt(saved, 10) : 5000;
+    return saved ? parseInt(saved, 10) : 2000;
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState<number | null>(null);

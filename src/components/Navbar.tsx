@@ -278,6 +278,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onChange={(e) => onChangeRefreshInterval(Number(e.target.value))}
               className="bg-transparent text-slate-700 dark:text-slate-300 font-mono text-xs sm:text-sm px-1.5 sm:px-2 py-1 outline-none cursor-pointer"
             >
+              <option value={1000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">1s (Ultra)</option>
+              <option value={2000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">2s (Fast)</option>
               <option value={3000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">3s</option>
               <option value={5000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">5s</option>
               <option value={10000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">10s</option>

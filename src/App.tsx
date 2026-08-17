@@ -14,6 +14,7 @@ import { LiveStockTable } from './components/LiveStockTable.js';
 import { FileUploadModal } from './components/FileUploadModal.js';
 import { AddStockModal } from './components/AddStockModal.js';
 import { StockDetailsModal } from './components/StockDetailsModal.js';
+import { StockScientificAnalysisModal } from './components/StockScientificAnalysisModal.js';
 import { AlertHistoryDrawer } from './components/AlertHistoryDrawer.js';
 import { AlertNotificationBanner } from './components/AlertNotificationBanner.js';
 import { StockReportModal } from './components/StockReportModal.js';
@@ -847,8 +848,8 @@ export default function App() {
         onAddStock={handleAddStock}
       />
 
-      {/* Stock Details & Interactive Chart Modal */}
-      <StockDetailsModal
+      {/* Stock Details & Scientific Quantitative Investment Analysis Modal */}
+      <StockScientificAnalysisModal
         stock={selectedStock}
         isOpen={Boolean(selectedStockSymbol)}
         onClose={() => setSelectedStockSymbol(null)}

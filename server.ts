@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
 import { marketService } from './server/src/services/MarketService.js';
+import { analysisService } from './server/src/services/AnalysisService.js';
 import { appStorage } from './server/src/database/storage.js';
 import { sqliteDb } from './server/src/database/sqlite.js';
 
@@ -204,6 +205,35 @@ async function startServer() {
       res.status(500).json({
         success: false,
         error: { code: 'PROFILE_FETCH_ERROR', message: 'Failed to fetch company profile' },
+      });
+    }
+  });
+
+  // Comprehensive Scientific Stock & Investment Analysis Data
+  app.get('/api/analysis/:symbol', async (req: Request, res: Response) => {
+    try {
+      const symbol = req.params.symbol?.trim().toUpperCase();
+      if (!symbol || !/^[A-Z0-9.\-=]+$/.test(symbol)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_SYMBOL', message: 'Valid stock symbol required' },
+        });
+      }
+
+      const analysisData = await analysisService.getFullAnalysisData(symbol);
+      if (!analysisData) {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'ANALYSIS_NOT_AVAILABLE', message: `Analysis data unavailable for ${symbol}` },
+        });
+      }
+
+      res.json({ success: true, data: analysisData });
+    } catch (err: any) {
+      console.error(`Error in /api/analysis/${req.params.symbol}:`, err);
+      res.status(500).json({
+        success: false,
+        error: { code: 'ANALYSIS_SERVER_ERROR', message: 'Failed to generate scientific stock analysis' },
       });
     }
   });

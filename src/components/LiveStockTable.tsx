@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Sparkles,
   Building2,
-  AlertCircle
+  AlertCircle,
+  Target
 } from 'lucide-react';
 import { StockItem, FilterType, SortField, SortDirection, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
@@ -582,14 +583,15 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           <Sparkles className="w-4 h-4" />
                         </button>
 
-                        {/* Open Analysis View */}
+                        {/* Open Scientific Quantitative Analysis View */}
                         <button
-                          id={`btn-view-${stock.symbol}`}
+                          id={`btn-analysis-${stock.symbol}`}
                           onClick={() => onSelectStock(stock.symbol)}
-                          title={t.actions.viewDetails}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title={lang === 'ar' ? 'التحليل الاستشاري والعلمي الشامل' : 'Scientific Quantitative Investment Analysis'}
+                          className="px-2 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white dark:hover:text-black border border-emerald-500/20 transition-all flex items-center gap-1 text-xs font-bold font-sans active:scale-95"
                         >
-                          <ExternalLink className="w-4 h-4" />
+                          <Target className="w-3.5 h-3.5" />
+                          <span className="hidden xl:inline">{lang === 'ar' ? 'تحليل علمي' : 'Analysis'}</span>
                         </button>
 
                         {/* Quick Delete */}

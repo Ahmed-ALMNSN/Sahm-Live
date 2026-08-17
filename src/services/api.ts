@@ -109,6 +109,18 @@ export class ApiService {
     }
   }
 
+  async fetchFullAnalysis(symbol: string) {
+    try {
+      const res = await fetch(`/api/analysis/${encodeURIComponent(symbol)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.data || null;
+    } catch (err) {
+      console.error(`fetchFullAnalysis error for ${symbol}:`, err);
+      return null;
+    }
+  }
+
   async fetchAlertHistory() {
     try {
       const res = await fetch('/api/alerts/history');

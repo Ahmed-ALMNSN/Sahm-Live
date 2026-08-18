@@ -8,7 +8,10 @@ export type FilterType =
   | 'ALERTS_ENABLED' 
   | 'UPPER_ALERT' 
   | 'LOWER_ALERT' 
-  | 'NO_ALERTS';
+  | 'NO_ALERTS'
+  | 'WITH_POSITIONS'
+  | 'PROFITABLE'
+  | 'UNPROFITABLE';
 
 export type SortField = 
   | 'symbol' 
@@ -20,9 +23,38 @@ export type SortField =
   | 'dayLow' 
   | 'upperAlert' 
   | 'lowerAlert' 
+  | 'netProfit'
+  | 'profitPercent'
+  | 'costBasis'
+  | 'currentValue'
   | 'lastUpdated';
 
 export type SortDirection = 'asc' | 'desc';
+
+export interface BrokeragePlatform {
+  id: string;
+  name_ar: string;
+  name_en: string;
+  country: string;
+  currency: string;
+  buy_commission_type: 'percentage' | 'fixed' | 'per_share';
+  buy_commission_value: number;
+  sell_commission_type: 'percentage' | 'fixed' | 'per_share';
+  sell_commission_value: number;
+  minimum_commission: number;
+  maximum_commission: number;
+  broker_fee: number;
+  exchange_fee: number; // percentage
+  regulatory_fee: number; // percentage
+  tax_rate: number; // percentage
+  vat_rate: number; // percentage
+  additional_fee: number;
+  notes?: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at?: number;
+  updated_at?: number;
+}
 
 export interface StockQuote {
   symbol: string;
@@ -72,8 +104,21 @@ export interface StockItem {
   lowerAlert: number | null;
   alertsEnabled: boolean;
   
-  // Alert crossing states: true means price is currently at or above upper alert (or below lower alert)
-  // Used to ensure notification ONLY fires when crossing the threshold, not repeatedly on every tick.
+  // Trading position fields
+  buyPrice?: number | null;
+  shares?: number | null;
+  brokerId?: string | null;
+  
+  // Calculated trading analytics
+  costBasis?: number;
+  currentValue?: number;
+  grossProfit?: number;
+  netProfit?: number;
+  profitPercent?: number;
+  totalFees?: number;
+  breakEvenPrice?: number;
+  
+  // Alert crossing states
   upperCrossedState?: boolean;
   lowerCrossedState?: boolean;
   
@@ -92,6 +137,7 @@ export interface ChartDataPoint {
   volume: number;
   sma20?: number;
   sma50?: number;
+  vwap?: number;
 }
 
 export interface CompanyProfile {
@@ -138,6 +184,9 @@ export interface ParsedStockData {
   price?: number;
   upperAlert?: number | null;
   lowerAlert?: number | null;
+  buyPrice?: number | null;
+  shares?: number | null;
+  brokerId?: string | null;
 }
 
 export interface FileParseResult {
@@ -151,4 +200,138 @@ export interface FileParseResult {
   sheetNames?: string[];
   selectedSheet?: string;
   error?: string;
+}
+
+export interface TradeCalculationInput {
+  symbol?: string;
+  buyPrice: number;
+  shares: number;
+  sellPrice?: number;
+  currentPrice?: number;
+  broker: BrokeragePlatform;
+  customBuyCommission?: number;
+  customSellCommission?: number;
+  customTaxRate?: number;
+  customVatRate?: number;
+  customAdditionalFees?: number;
+}
+
+export interface TradeCalculationResult {
+  symbol: string;
+  buyPrice: number;
+  shares: number;
+  sellPrice: number;
+  currentPrice: number;
+  
+  // Buy Breakdown
+  grossBuyAmount: number;
+  buyCommission: number;
+  buyBrokerFee: number;
+  buyExchangeFee: number;
+  buyRegulatoryFee: number;
+  buyTax: number;
+  buyVat: number;
+  buyAdditionalFees: number;
+  totalBuyFees: number;
+  totalCost: number;
+  effectiveCostPerShare: number;
+
+  // Sell Breakdown
+  grossSellAmount: number;
+  sellCommission: number;
+  sellBrokerFee: number;
+  sellExchangeFee: number;
+  sellRegulatoryFee: number;
+  sellTax: number;
+  sellVat: number;
+  sellAdditionalFees: number;
+  totalSellFees: number;
+  netSellAmount: number;
+
+  // Combined Results & Profitability
+  totalFees: number;
+  feePercentageOfCapital: number;
+  grossProfit: number;
+  netProfit: number;
+  netLoss: number;
+  profitPercent: number;
+  profitPerShare: number;
+  breakEvenPrice: number;
+  isProfitable: boolean;
+  currency: string;
+  brokerName: string;
+}
+
+export interface PortfolioPosition {
+  id: string;
+  userId?: string;
+  symbol: string;
+  companyName?: string;
+  brokerId: string;
+  brokerName?: string;
+  quantity: number;
+  averageBuyPrice: number;
+  totalCost: number;
+  totalFees: number;
+  currentPrice?: number;
+  marketValue?: number;
+  unrealizedProfit?: number;
+  unrealizedProfitPercent?: number;
+  estimatedExitFees?: number;
+  netUnrealizedProfit?: number;
+  openedAt: number;
+  status: 'OPEN' | 'CLOSED';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TradeRecord {
+  id: string;
+  userId?: string;
+  symbol: string;
+  brokerId: string;
+  brokerName?: string;
+  type: 'BUY' | 'SELL';
+  quantity: number;
+  price: number;
+  grossAmount: number;
+  commission: number;
+  brokerFee: number;
+  exchangeFee: number;
+  regulatoryFee: number;
+  tax: number;
+  vat: number;
+  additionalFees: number;
+  totalFees: number;
+  netAmount: number;
+  executedAt: number;
+}
+
+export interface UserSettings {
+  theme: Theme;
+  lang: Language;
+  refreshInterval: number;
+  defaultBrokerId: string;
+  soundAlerts: boolean;
+  notificationPermission: string;
+}
+
+export interface ImportJobRecord {
+  id: string;
+  filename: string;
+  fileType: string;
+  importedRows: number;
+  successfulRows: number;
+  failedRows: number;
+  importedAt: number;
+}
+
+export interface AuditLogRecord {
+  id: string;
+  userId: string;
+  action: string;
+  entity: string;
+  entityId?: string;
+  timestamp: number;
+  metadata?: string;
 }

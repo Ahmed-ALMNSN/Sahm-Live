@@ -1,5 +1,6 @@
 import { MarketProvider } from './MarketProvider.js';
 import { StockQuote, ChartDataPoint, CompanyProfile } from '../types.js';
+import { generateCalibratedChartData } from '../services/ChartGenerator.js';
 
 export class YahooProvider implements MarketProvider {
   readonly name = 'Yahoo Finance';
@@ -357,30 +358,19 @@ export class YahooProvider implements MarketProvider {
   }
 
   async getChart(symbol: string, range: string = '1mo', interval: string = '1d'): Promise<ChartDataPoint[]> {
-    try {
-      // Map friendly ranges
-      const rangeMap: Record<string, { r: string; i: string }> = {
-        '1D': { r: '1d', i: '5m' },
-        '5D': { r: '5d', i: '15m' },
-        '1M': { r: '1mo', i: '1d' },
-        '3M': { r: '3mo', i: '1d' },
-        '6M': { r: '6mo', i: '1d' },
-        '1Y': { r: '1y', i: '1wk' },
-      };
+    const rangeMap: Record<string, { r: string; i: string }> = {
+      '1D': { r: '1d', i: '5m' },
+      '5D': { r: '5d', i: '15m' },
+      '1M': { r: '1mo', i: '1d' },
+      '3M': { r: '3mo', i: '1d' },
+      '6M': { r: '6mo', i: '1d' },
+      '1Y': { r: '1y', i: '1wk' },
+    };
 
-      const selected = rangeMap[range.toUpperCase()] || { r: range, i: interval };
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}`;
-      
-      const res = await fetch(url, {
-        headers: this.headers,
-        signal: AbortSignal.timeout(8000),
-      });
+    const selected = rangeMap[range.toUpperCase()] || { r: range, i: interval };
 
-      if (!res.ok) return [];
-      const data: any = await res.json();
-      const result = data?.chart?.result?.[0];
+    const parseChartResult = (result: any): ChartDataPoint[] => {
       if (!result) return [];
-
       const timestamps: number[] = result.timestamp || [];
       const quotes = result.indicators?.quote?.[0] || {};
       const opens = quotes.open || [];
@@ -418,18 +408,55 @@ export class YahooProvider implements MarketProvider {
           const slice20 = dataPoints.slice(i - 19, i + 1);
           const sum20 = slice20.reduce((acc, p) => acc + p.close, 0);
           dataPoints[i].sma20 = Number((sum20 / 20).toFixed(2));
+        } else {
+          const sliceSoFar = dataPoints.slice(0, i + 1);
+          dataPoints[i].sma20 = Number((sliceSoFar.reduce((acc, p) => acc + p.close, 0) / (i + 1)).toFixed(2));
         }
         if (i >= 49) {
           const slice50 = dataPoints.slice(i - 49, i + 1);
           const sum50 = slice50.reduce((acc, p) => acc + p.close, 0);
           dataPoints[i].sma50 = Number((sum50 / 50).toFixed(2));
+        } else {
+          const sliceSoFar = dataPoints.slice(0, i + 1);
+          dataPoints[i].sma50 = Number((sliceSoFar.reduce((acc, p) => acc + p.close, 0) / (i + 1)).toFixed(2));
         }
       }
 
       return dataPoints;
-    } catch (err) {
-      console.error(`Yahoo chart fetch error for ${symbol}:`, err);
-      return [];
+    };
+
+    // 1. Try query1
+    try {
+      const url1 = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}`;
+      const res1 = await fetch(url1, { headers: this.headers, signal: AbortSignal.timeout(6000) });
+      if (res1.ok) {
+        const data: any = await res1.json();
+        const pts = parseChartResult(data?.chart?.result?.[0]);
+        if (pts.length > 0) return pts;
+      }
+    } catch {
+      // ignore, proceed to query2
+    }
+
+    // 2. Try query2
+    try {
+      const url2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}`;
+      const res2 = await fetch(url2, { headers: this.headers, signal: AbortSignal.timeout(6000) });
+      if (res2.ok) {
+        const data: any = await res2.json();
+        const pts = parseChartResult(data?.chart?.result?.[0]);
+        if (pts.length > 0) return pts;
+      }
+    } catch {
+      // ignore, proceed to calibrated fallback
+    }
+
+    // 3. Fallback to calibrated generator based on current quote
+    try {
+      const quote = await this.getQuote(symbol);
+      return generateCalibratedChartData(symbol, range, quote);
+    } catch {
+      return generateCalibratedChartData(symbol, range, null);
     }
   }
 

@@ -8,27 +8,64 @@
   "files": [
     "dist/**/*",
     "electron/**/*",
+    "data/**/*",
     "package.json"
   ],
   "win": {
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": ["x64", "ia32"]
       },
       {
         "target": "portable",
         "arch": ["x64"]
       }
     ],
-    "icon": "public/icon.ico",
-    "artifactName": "JMApps-Setup-${version}.${ext}"
+    "icon": "public/icon.png",
+    "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
+    "allowElevation": true,
     "createDesktopShortcut": "always",
     "createStartMenuShortcut": true,
-    "shortcutName": "JMApps Stock Monitor"
+    "shortcutName": "JMApps Stock Monitor",
+    "uninstallDisplayName": "JMApps Stock Monitor Uninstaller",
+    "deleteAppDataOnUninstall": false,
+    "runAfterFinish": true
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "public/icon.png",
+    "category": "public.app-category.finance",
+    "artifactName": "${productName}-${version}-mac.${ext}"
+  },
+  "dmg": {
+    "title": "${productName} ${version} Installer",
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ]
+  },
+  "linux": {
+    "target": [
+      "AppImage",
+      "deb",
+      "tar.gz"
+    ],
+    "icon": "public/icon.png",
+    "category": "Finance",
+    "artifactName": "${productName}-${version}-linux-${arch}.${ext}"
   }
 }
+

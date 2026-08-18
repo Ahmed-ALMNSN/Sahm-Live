@@ -18,7 +18,8 @@ import {
   Sparkles,
   Building2,
   AlertCircle,
-  Target
+  Target,
+  Calculator
 } from 'lucide-react';
 import { StockItem, FilterType, SortField, SortDirection, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
@@ -31,6 +32,7 @@ interface LiveStockTableProps {
   onClearAllStocks?: () => void;
   onSelectStock: (symbol: string) => void;
   onTestTriggerAlert: (stock: StockItem) => void;
+  onOpenCalculator?: (stock: StockItem) => void;
 }
 
 export const LiveStockTable: React.FC<LiveStockTableProps> = ({
@@ -41,6 +43,7 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
   onClearAllStocks,
   onSelectStock,
   onTestTriggerAlert,
+  onOpenCalculator,
 }) => {
   const t = getTranslation(lang);
 
@@ -593,6 +596,18 @@ export const LiveStockTable: React.FC<LiveStockTableProps> = ({
                           <Target className="w-3.5 h-3.5" />
                           <span className="hidden xl:inline">{lang === 'ar' ? 'تحليل علمي' : 'Analysis'}</span>
                         </button>
+
+                        {/* Open Trading Calculator for this specific stock */}
+                        {onOpenCalculator && (
+                          <button
+                            id={`btn-calc-${stock.symbol}`}
+                            onClick={() => onOpenCalculator(stock)}
+                            title={lang === 'ar' ? 'حاسبة التداول واتخاذ القرار' : 'Trading Calculator & Decision Engine'}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+                          >
+                            <Calculator className="w-4 h-4" />
+                          </button>
+                        )}
 
                         {/* Quick Delete */}
                         <button

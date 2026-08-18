@@ -31,7 +31,8 @@ import {
   Minimize2,
   Lock,
   ArrowRight,
-  TrendingDown as BearishIcon
+  TrendingDown as BearishIcon,
+  Calculator
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -51,12 +52,15 @@ import {
 import { StockItem, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { apiService } from '../services/api.js';
+import { getClientFallbackChart } from '../utils/clientChartFallback.js';
 import {
   runScientificAnalysis,
   QuantitativeAnalysisResult,
   QuantitativeConfig,
   DEFAULT_CONFIG
 } from '../utils/quantitativeEngine.js';
+import { ErrorBoundary } from './ErrorBoundary.js';
+import { TradingCalculator } from './TradingCalculator.js';
 
 interface StockScientificAnalysisModalProps {
   stock: StockItem | null;
@@ -66,7 +70,7 @@ interface StockScientificAnalysisModalProps {
   onUpdateAlerts: (symbol: string, upperAlert: number | null, lowerAlert: number | null, alertsEnabled: boolean) => void;
 }
 
-type TabType = 'DECISION' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS';
+type TabType = 'DECISION' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS' | 'CALCULATOR';
 
 export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModalProps> = ({
   stock,
@@ -117,31 +121,61 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
   const analysis: QuantitativeAnalysisResult | null = useMemo(() => {
     if (!stock) return null;
     
-    // Merge live quote into fullData if available
+    // Merge live quote and charts into fullData if available
+    const safePrice = (stock.price && stock.price > 0) ? stock.price : 100;
     const mergedData = fullData ? { ...fullData } : {
       symbol: stock.symbol,
+      companyName: stock.companyName || stock.symbol,
+      exchange: stock.exchange || 'US Market',
+      sector: stock.sector || 'General Market',
+      industry: stock.industry || 'Equities',
+      currency: stock.currency || 'USD',
       quote: {
-        price: stock.price,
-        change: stock.change,
-        changePercent: stock.changePercent,
-        open: stock.open,
-        previousClose: stock.previousClose,
-        high: stock.dayHigh,
-        low: stock.dayLow,
-        volume: stock.volume,
-        fiftyTwoWeekHigh: stock.fiftyTwoWeekHigh || stock.price,
-        fiftyTwoWeekLow: stock.fiftyTwoWeekLow || stock.price,
+        price: safePrice,
+        change: stock.change || 0,
+        changePercent: stock.changePercent || 0,
+        open: stock.open || safePrice,
+        previousClose: stock.previousClose || safePrice,
+        high: stock.dayHigh || safePrice * 1.02,
+        low: stock.dayLow || safePrice * 0.98,
+        volume: stock.volume || 1000000,
+        fiftyTwoWeekHigh: stock.fiftyTwoWeekHigh || safePrice * 1.2,
+        fiftyTwoWeekLow: stock.fiftyTwoWeekLow || safePrice * 0.8,
         marketState: stock.marketState || 'REGULAR',
         timestamp: stock.lastUpdated || Date.now(),
       },
       charts: {},
     };
 
-    if (mergedData.quote && stock.price > 0) {
+    if (!mergedData.quote) {
+      mergedData.quote = {
+        price: safePrice,
+        change: stock.change || 0,
+        changePercent: stock.changePercent || 0,
+        open: stock.open || safePrice,
+        previousClose: stock.previousClose || safePrice,
+        high: stock.dayHigh || safePrice * 1.02,
+        low: stock.dayLow || safePrice * 0.98,
+        volume: stock.volume || 1000000,
+        fiftyTwoWeekHigh: stock.fiftyTwoWeekHigh || safePrice * 1.2,
+        fiftyTwoWeekLow: stock.fiftyTwoWeekLow || safePrice * 0.8,
+        marketState: stock.marketState || 'REGULAR',
+        timestamp: stock.lastUpdated || Date.now(),
+      };
+    } else if (stock.price > 0) {
       mergedData.quote.price = stock.price;
       mergedData.quote.change = stock.change;
       mergedData.quote.changePercent = stock.changePercent;
       mergedData.quote.volume = stock.volume || mergedData.quote.volume;
+    }
+
+    // Ensure all timeframe charts are populated with valid data
+    if (!mergedData.charts) mergedData.charts = {};
+    const timeframes = ['1D', '5D', '1M', '3M', '6M', '1Y'];
+    for (const tf of timeframes) {
+      if (!mergedData.charts[tf] || !Array.isArray(mergedData.charts[tf]) || mergedData.charts[tf].length === 0) {
+        mergedData.charts[tf] = getClientFallbackChart(stock, tf);
+      }
     }
 
     return runScientificAnalysis(mergedData, { weights: userWeights });
@@ -169,8 +203,16 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
     window.print();
   };
 
-  // Active chart series based on selectedRange
-  const activeChartSeries = fullData?.charts?.[selectedRange] || [];
+  // Active chart series based on selectedRange with fallback
+  const activeChartSeries = useMemo(() => {
+    if (fullData?.charts?.[selectedRange] && fullData.charts[selectedRange].length > 0) {
+      return fullData.charts[selectedRange];
+    }
+    if (stock) {
+      return getClientFallbackChart(stock, selectedRange);
+    }
+    return [];
+  }, [fullData?.charts, selectedRange, stock]);
 
   // Decision Badging Helper
   const getDecisionBadge = (decision: string) => {
@@ -295,6 +337,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
         <div className="px-3 sm:px-6 bg-[#0d1017] border-b border-slate-800/90 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {[
             { id: 'DECISION', label: isAr ? 'القرار والاستشارة' : 'Advisory Decision', icon: <Target className="w-4 h-4" /> },
+            { id: 'CALCULATOR', label: isAr ? 'حاسبة التداول والعمولات' : 'Trading Calculator', icon: <Calculator className="w-4 h-4" /> },
             { id: 'CHARTS', label: isAr ? 'الشارت والمؤشرات' : 'Technicals & Charts', icon: <BarChart2 className="w-4 h-4" /> },
             { id: 'VOLUME', label: isAr ? 'الحجم والسرعة RVOL' : 'Volume & RVOL', icon: <Activity className="w-4 h-4" /> },
             { id: 'FUNDAMENTALS', label: isAr ? 'التحليل المالي والجودة' : 'Financial Quality', icon: <Building2 className="w-4 h-4" /> },
@@ -1292,6 +1335,36 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
               </div>
 
             </div>
+          )}
+
+          {/* ===================== TAB 9: TRADING & BROKERAGE CALCULATOR ===================== */}
+          {activeTab === 'CALCULATOR' && (
+            <ErrorBoundary fallbackTitle="حدث خطأ في حاسبة التداول">
+              <div className="max-w-5xl mx-auto py-2">
+                <TradingCalculator
+                  initialSymbol={analysis.symbol}
+                  initialBuyPrice={analysis.tradeSetup?.preferredEntryMax || analysis.price}
+                  initialShares={50}
+                  initialCurrentPrice={analysis.price}
+                  onSaveToWatchlist={(data) => {
+                    apiService.saveWatchlistItem({
+                      symbol: data.symbol,
+                      buyPrice: data.buyPrice,
+                      shares: data.shares,
+                      brokerId: data.brokerId,
+                    });
+                  }}
+                  onSaveToPortfolio={(data) => {
+                    apiService.savePortfolioPosition({
+                      symbol: data.symbol,
+                      quantity: data.shares,
+                      averageBuyPrice: data.buyPrice,
+                      brokerId: data.brokerId,
+                    });
+                  }}
+                />
+              </div>
+            </ErrorBoundary>
           )}
 
         </div>

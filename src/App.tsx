@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Language, 
   Theme, 
@@ -13,11 +13,14 @@ import { KpiCards } from './components/KpiCards.js';
 import { LiveStockTable } from './components/LiveStockTable.js';
 import { FileUploadModal } from './components/FileUploadModal.js';
 import { AddStockModal } from './components/AddStockModal.js';
-import { StockDetailsModal } from './components/StockDetailsModal.js';
 import { StockScientificAnalysisModal } from './components/StockScientificAnalysisModal.js';
 import { AlertHistoryDrawer } from './components/AlertHistoryDrawer.js';
 import { AlertNotificationBanner } from './components/AlertNotificationBanner.js';
 import { StockReportModal } from './components/StockReportModal.js';
+import { CalculatorModal } from './components/CalculatorModal.js';
+import { PortfolioModal } from './components/PortfolioModal.js';
+import { BrokerManagementModal } from './components/BrokerManagementModal.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { alertEngine } from './utils/alertEngine.js';
 import { apiService } from './services/api.js';
 
@@ -188,21 +191,9 @@ export default function App() {
     return (localStorage.getItem('sahm_theme') as Theme) || 'dark';
   });
 
-  // 3. Stocks watchlist state
-  const [stocks, setStocks] = useState<StockItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('sahm_watchlist');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return DEFAULT_STOCKS;
-  });
+  // 3. Stocks watchlist state - Single Source of Truth is Database
+  const [stocks, setStocks] = useState<StockItem[]>([]);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
 
   // 4. Alert History & Toasts
   const [alertHistory, setAlertHistory] = useState<AlertHistoryItem[]>([]);
@@ -233,6 +224,10 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
+  const [calculatorStockSymbol, setCalculatorStockSymbol] = useState<string | null>(null);
+  const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
+  const [isBrokersModalOpen, setIsBrokersModalOpen] = useState(false);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string | null>(null);
 
   // Ref lock to prevent overlapping quote batches
@@ -247,9 +242,10 @@ export default function App() {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
     localStorage.setItem('sahm_lang', lang);
+    apiService.saveSettings({ language: lang });
   }, [lang]);
 
-  // Sync Theme on DOM
+  // Sync Theme on DOM (Dark / Light)
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -257,60 +253,78 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('sahm_theme', theme);
+    apiService.saveSettings({ theme: theme });
   }, [theme]);
-
-  // Sync Watchlist to localStorage
-  useEffect(() => {
-    localStorage.setItem('sahm_watchlist', JSON.stringify(stocks));
-  }, [stocks]);
 
   // Save refresh interval
   useEffect(() => {
     localStorage.setItem('sahm_refresh_interval', refreshInterval.toString());
+    apiService.saveSettings({ refresh_interval: refreshInterval.toString() });
   }, [refreshInterval]);
 
-  // Initial load: Fetch stocks & alert history from SQLite backend
+  // -------------------------------------------------------------
+  // DATABASE AS SINGLE SOURCE OF TRUTH: Initial Load from SQLite
+  // -------------------------------------------------------------
   useEffect(() => {
-    // Load stocks from SQLite
-    apiService.fetchSqliteStocks().then((sqliteStocks) => {
-      if (Array.isArray(sqliteStocks) && sqliteStocks.length > 0) {
-        setStocks(prev => {
-          const map = new Map<string, StockItem>(prev.map(p => [p.symbol, p]));
-          const merged: StockItem[] = sqliteStocks.map((s: any) => {
-            const existing = map.get(s.symbol);
-            return {
-              symbol: s.symbol,
-              companyName: s.name || existing?.companyName || s.symbol,
-              sector: s.sector || existing?.sector || 'General',
-              exchange: s.exchange || existing?.exchange || 'US',
-              price: existing?.price || s.price || 0,
-              change: existing?.change || 0,
-              changePercent: existing?.changePercent || 0,
-              open: existing?.open || 0,
-              previousClose: existing?.previousClose || 0,
-              dayHigh: existing?.dayHigh || 0,
-              dayLow: existing?.dayLow || 0,
-              volume: existing?.volume || 0,
-              upperAlert: s.upperAlert !== undefined ? s.upperAlert : (existing?.upperAlert ?? null),
-              lowerAlert: s.lowerAlert !== undefined ? s.lowerAlert : (existing?.lowerAlert ?? null),
-              alertsEnabled: s.alertsEnabled !== undefined ? Boolean(s.alertsEnabled) : (existing?.alertsEnabled ?? true),
-              lastUpdated: existing?.lastUpdated || 0,
-            };
-          });
-          return merged;
-        });
-      }
-    });
+    const initializeDatabaseData = async () => {
+      try {
+        const [dbStocks, dbHistory, dbSettings] = await Promise.all([
+          apiService.fetchWatchlist(),
+          apiService.fetchAlertHistory(),
+          apiService.fetchSettings(),
+        ]);
 
-    // Load alert history from SQLite
-    apiService.fetchAlertHistory().then((hist) => {
-      if (Array.isArray(hist)) {
-        setAlertHistory(hist);
-        const todayStr = new Date().toDateString();
-        const countToday = hist.filter(h => new Date(h.timestamp).toDateString() === todayStr).length;
-        setTriggeredCountToday(countToday);
+        // If settings returned theme or lang, sync
+        if (dbSettings) {
+          if (dbSettings.theme && (dbSettings.theme === 'light' || dbSettings.theme === 'dark')) {
+            setTheme(dbSettings.theme as Theme);
+          }
+          if (dbSettings.language && (dbSettings.language === 'ar' || dbSettings.language === 'en')) {
+            setLang(dbSettings.language as Language);
+          }
+        }
+
+        if (Array.isArray(dbStocks) && dbStocks.length > 0) {
+          const loadedStocks: StockItem[] = dbStocks.map((s: any) => ({
+            symbol: s.symbol,
+            companyName: s.name || s.companyName || s.symbol,
+            sector: s.sector || 'General',
+            exchange: s.exchange || 'US',
+            price: s.price || 0,
+            change: 0,
+            changePercent: 0,
+            open: 0,
+            previousClose: 0,
+            dayHigh: 0,
+            dayLow: 0,
+            volume: 0,
+            upperAlert: s.upperAlert !== undefined && s.upperAlert !== null ? Number(s.upperAlert) : null,
+            lowerAlert: s.lowerAlert !== undefined && s.lowerAlert !== null ? Number(s.lowerAlert) : null,
+            alertsEnabled: s.alertsEnabled !== undefined ? Boolean(s.alertsEnabled) : true,
+            lastUpdated: 0,
+          }));
+          setStocks(loadedStocks);
+        } else {
+          // If database is empty, bootstrap with default stocks and save to database
+          setStocks(DEFAULT_STOCKS);
+          apiService.syncAllStocks(DEFAULT_STOCKS);
+        }
+
+        if (Array.isArray(dbHistory)) {
+          setAlertHistory(dbHistory);
+          const todayStr = new Date().toDateString();
+          const countToday = dbHistory.filter(h => new Date(h.timestamp).toDateString() === todayStr).length;
+          setTriggeredCountToday(countToday);
+        }
+      } catch (err) {
+        console.error('Error initializing data from database:', err);
+        setStocks(DEFAULT_STOCKS);
+      } finally {
+        setIsDbLoaded(true);
       }
-    });
+    };
+
+    initializeDatabaseData();
   }, []);
 
   // Request browser notification permission
@@ -390,7 +404,7 @@ export default function App() {
             setSelectedStockSymbol(sym);
           });
 
-          // Record in SQLite backend API
+          // Record in SQLite backend database
           apiService.recordAlertHistory({
             symbol: alert.symbol,
             companyName: alert.companyName,
@@ -428,7 +442,8 @@ export default function App() {
 
   // Polling loop
   useEffect(() => {
-    // Initial fetch
+    if (!isDbLoaded) return;
+
     fetchMarketQuotes();
 
     const intervalId = setInterval(() => {
@@ -436,7 +451,7 @@ export default function App() {
     }, refreshInterval);
 
     return () => clearInterval(intervalId);
-  }, [fetchMarketQuotes, refreshInterval]);
+  }, [fetchMarketQuotes, refreshInterval, isDbLoaded]);
 
   // Flash animation cleaner
   useEffect(() => {
@@ -461,11 +476,8 @@ export default function App() {
     try {
       const currentList = stocksRef.current || stocks;
       
-      // 1. Synchronize all stocks and alerts to persistent SQLite database
+      // Synchronize all stocks and alerts to persistent SQLite database
       const res = await apiService.syncAllStocks(currentList);
-      
-      // 2. Commit to localStorage cache
-      localStorage.setItem('sahm_watchlist', JSON.stringify(currentList));
       
       setHasUnsavedChanges(false);
       setLastSavedTime(Date.now());
@@ -512,10 +524,10 @@ export default function App() {
           upperCrossedState: false,
           lowerCrossedState: false,
         };
-        // Persist to SQLite
-        apiService.saveSqliteStock({
+        // Persist directly to SQLite Single Source of Truth
+        apiService.saveWatchlistItem({
           symbol: stock.symbol,
-          name: stock.companyName,
+          companyName: stock.companyName,
           sector: stock.sector,
           upperAlert,
           lowerAlert,
@@ -542,35 +554,30 @@ export default function App() {
     setHasUnsavedChanges(true);
 
     // 1. Permanent removal from React state
-    setStocks(prev => {
-      const filtered = prev.filter(s => s.symbol.toUpperCase() !== symUpper);
-      localStorage.setItem('sahm_watchlist', JSON.stringify(filtered));
-      return filtered;
-    });
+    setStocks(prev => prev.filter(s => s.symbol.toUpperCase() !== symUpper));
 
-    // 2. Permanent deletion from SQLite database in backend
-    apiService.deleteSqliteStock(symUpper);
+    // 2. Permanent deletion from SQLite database (Single Source of Truth)
+    apiService.deleteWatchlistItem(symUpper);
 
     // 3. Clear any active toast for that symbol
     setActiveToasts(prev => prev.filter(t => t.symbol.toUpperCase() !== symUpper));
 
     // 4. Show confirmation
     const msg = lang === 'ar' 
-      ? `تم الحذف النهائي للسهم (${symUpper}) من المراقبة بنجاح`
-      : `Stock (${symUpper}) permanently deleted from watchlist`;
+      ? `تم الحذف النهائي للسهم (${symUpper}) من قاعدة البيانات بنجاح`
+      : `Stock (${symUpper}) permanently deleted from database`;
     showActionToast(msg, 'info');
   };
 
   const handleClearAllStocks = () => {
     setHasUnsavedChanges(true);
     setStocks([]);
-    localStorage.setItem('sahm_watchlist', JSON.stringify([]));
     setActiveToasts([]);
-    apiService.clearAllSqliteStocks();
+    apiService.clearWatchlist();
 
     const msg = lang === 'ar' 
-      ? 'تم الحذف النهائي لجميع الأسهم من المراقبة بنجاح'
-      : 'All stocks permanently deleted from watchlist';
+      ? 'تم الحذف النهائي لجميع الأسهم من قاعدة البيانات بنجاح'
+      : 'All stocks permanently deleted from database';
     showActionToast(msg, 'info');
   };
 
@@ -605,25 +612,23 @@ export default function App() {
       const otherStocks = prev.filter(s => s.symbol.toUpperCase() !== symUpper);
       const updatedList = [newStock, ...otherStocks];
 
-      // Save to SQLite
-      apiService.saveSqliteStock({
+      // Save directly to SQLite
+      apiService.saveWatchlistItem({
         symbol: symUpper,
-        name: newStock.companyName,
+        companyName: newStock.companyName,
         sector: newStock.sector,
         exchange: newStock.exchange,
-        price: newStock.price,
         upperAlert: newStock.upperAlert,
         lowerAlert: newStock.lowerAlert,
         alertsEnabled: true,
       });
 
-      localStorage.setItem('sahm_watchlist', JSON.stringify(updatedList));
       return updatedList;
     });
 
     const msg = lang === 'ar'
-      ? `تمت إضافة السهم (${symUpper}) في أعلى القائمة مع الاحتفاظ بكافة الأسهم السابقة`
-      : `Stock (${symUpper}) added to top of watchlist. All previous stocks retained`;
+      ? `تمت إضافة السهم (${symUpper}) في أعلى القائمة وحفظه في قاعدة البيانات`
+      : `Stock (${symUpper}) added to top and persisted to database`;
     showActionToast(msg, 'success');
 
     // Immediately trigger fetch for the new stock
@@ -638,14 +643,12 @@ export default function App() {
     setStocks(prev => {
       const existingMap = new Map<string, StockItem>(prev.map(s => [s.symbol.toUpperCase(), s]));
       const newItems: StockItem[] = [];
-      let updatedCount = 0;
 
       for (const p of parsed) {
         const sym = p.symbol.trim().toUpperCase();
         if (!sym) continue;
 
         if (existingMap.has(sym)) {
-          // Update existing stock's alert levels if provided, while keeping live market stats
           const old = existingMap.get(sym)!;
           const updated: StockItem = {
             ...old,
@@ -655,9 +658,7 @@ export default function App() {
             lowerAlert: p.lowerAlert !== undefined && p.lowerAlert !== null ? p.lowerAlert : old.lowerAlert,
           };
           existingMap.set(sym, updated);
-          updatedCount++;
         } else {
-          // New stock to be prepended on top
           newItems.push({
             symbol: sym,
             companyName: p.companyName || sym,
@@ -682,13 +683,12 @@ export default function App() {
       // PREPEND: Put all new items on top, retaining all previous stocks
       const combined = [...newItems, ...Array.from(existingMap.values())];
 
-      // Bulk persist to SQLite
-      apiService.bulkSaveSqliteStocks(combined);
-      localStorage.setItem('sahm_watchlist', JSON.stringify(combined));
+      // Bulk persist to SQLite Single Source of Truth
+      apiService.importWatchlist(combined, filename, filename.split('.').pop());
 
       const msg = lang === 'ar'
-        ? `تم بنجاح استيراد ${newItems.length} سهم جديد في أعلى القائمة والاحتفاظ بـ ${existingMap.size} سهم سابق من (${filename})`
-        : `Successfully imported ${newItems.length} new stocks on top, retaining ${existingMap.size} previous stocks from (${filename})`;
+        ? `تم بنجاح استيراد ${newItems.length} سهم جديد والاحتفاظ بـ ${existingMap.size} سهم سابق في قاعدة البيانات`
+        : `Successfully imported ${newItems.length} new stocks into database (${filename})`;
       showActionToast(msg, 'success');
 
       return combined;
@@ -755,7 +755,28 @@ export default function App() {
     setActiveToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  const selectedStock = stocks.find(s => s.symbol === selectedStockSymbol) || null;
+  const selectedStock = useMemo(() => {
+    if (!selectedStockSymbol) return null;
+    const found = stocks.find(s => s.symbol.toUpperCase() === selectedStockSymbol.toUpperCase());
+    if (found) return found;
+    return {
+      symbol: selectedStockSymbol.toUpperCase(),
+      companyName: selectedStockSymbol.toUpperCase(),
+      sector: 'General',
+      price: 100,
+      change: 0,
+      changePercent: 0,
+      open: 100,
+      previousClose: 100,
+      dayHigh: 102,
+      dayLow: 98,
+      volume: 1000000,
+      upperAlert: null,
+      lowerAlert: null,
+      alertsEnabled: true,
+      lastUpdated: Date.now(),
+    } as StockItem;
+  }, [stocks, selectedStockSymbol]);
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#0a0b0d] text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
@@ -772,6 +793,9 @@ export default function App() {
         onOpenAdd={() => setIsAddModalOpen(true)}
         onOpenHistory={() => setIsHistoryDrawerOpen(true)}
         onOpenReport={() => setIsReportModalOpen(true)}
+        onOpenCalculator={() => setIsCalculatorModalOpen(true)}
+        onOpenPortfolio={() => setIsPortfolioModalOpen(true)}
+        onOpenBrokers={() => setIsBrokersModalOpen(true)}
         historyCount={alertHistory.length}
         onManualRefresh={fetchMarketQuotes}
         isRefreshing={isRefreshing}
@@ -804,6 +828,10 @@ export default function App() {
           onClearAllStocks={handleClearAllStocks}
           onSelectStock={(sym) => setSelectedStockSymbol(sym)}
           onTestTriggerAlert={handleTestTriggerAlert}
+          onOpenCalculator={(stock) => {
+            setCalculatorStockSymbol(stock.symbol);
+            setIsCalculatorModalOpen(true);
+          }}
         />
 
       </main>
@@ -813,7 +841,7 @@ export default function App() {
         <div className="flex items-center flex-wrap gap-2.5 sm:gap-4">
           <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-slate-500 dark:text-slate-400">ENGINE:</span> ONLINE (ACTIVE FEED)
+            <span className="text-slate-500 dark:text-slate-400">DATABASE:</span> SQLITE (SINGLE SOURCE OF TRUTH)
           </span>
           <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
           <span className="hidden sm:inline">
@@ -825,7 +853,7 @@ export default function App() {
           </span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM LIVE MONITOR v2.5</span>
+          <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM QUANT ENGINE v3.0</span>
           <span className="text-slate-300 dark:text-slate-600">•</span>
           <span className="text-emerald-600 dark:text-emerald-400 font-bold">200 OK</span>
         </div>
@@ -849,13 +877,50 @@ export default function App() {
       />
 
       {/* Stock Details & Scientific Quantitative Investment Analysis Modal */}
-      <StockScientificAnalysisModal
-        stock={selectedStock}
-        isOpen={Boolean(selectedStockSymbol)}
-        onClose={() => setSelectedStockSymbol(null)}
-        lang={lang}
-        onUpdateAlerts={handleUpdateAlerts}
-      />
+      <ErrorBoundary fallbackTitle="تعذر فتح شاشة التحليل الكمي">
+        <StockScientificAnalysisModal
+          stock={selectedStock}
+          isOpen={Boolean(selectedStockSymbol)}
+          onClose={() => setSelectedStockSymbol(null)}
+          lang={lang}
+          onUpdateAlerts={handleUpdateAlerts}
+        />
+      </ErrorBoundary>
+
+      {/* Quick Trading Calculator Modal */}
+      <ErrorBoundary fallbackTitle="تعذر فتح حاسبة التداول">
+        <CalculatorModal
+          isOpen={isCalculatorModalOpen}
+          onClose={() => {
+            setIsCalculatorModalOpen(false);
+            setCalculatorStockSymbol(null);
+          }}
+          lang={lang}
+          initialSymbol={calculatorStockSymbol || selectedStockSymbol || undefined}
+          watchlistStocks={stocks}
+          onOpenScientificAnalysis={(sym) => {
+            setIsCalculatorModalOpen(false);
+            setCalculatorStockSymbol(null);
+            setSelectedStockSymbol(sym);
+          }}
+        />
+      </ErrorBoundary>
+
+      {/* Portfolio & Positions Modal */}
+      <ErrorBoundary fallbackTitle="تعذر فتح المحفظة الاستثمارية">
+        <PortfolioModal
+          isOpen={isPortfolioModalOpen}
+          onClose={() => setIsPortfolioModalOpen(false)}
+        />
+      </ErrorBoundary>
+
+      {/* Broker Platforms Modal */}
+      <ErrorBoundary fallbackTitle="تعذر فتح إدارة المنصات المالية">
+        <BrokerManagementModal
+          isOpen={isBrokersModalOpen}
+          onClose={() => setIsBrokersModalOpen(false)}
+        />
+      </ErrorBoundary>
 
       {/* Alert History Drawer */}
       <AlertHistoryDrawer

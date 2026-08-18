@@ -1,4 +1,14 @@
-import { StockQuote } from '../types.js';
+import {
+  StockQuote,
+  BrokeragePlatform,
+  TradeCalculationInput,
+  TradeCalculationResult,
+  PortfolioPosition,
+  TradeRecord,
+  UserSettings,
+  ImportJobRecord,
+  AuditLogRecord,
+} from '../types.js';
 
 export interface BatchQuotesResponse {
   quotes: StockQuote[];
@@ -7,13 +17,14 @@ export interface BatchQuotesResponse {
 }
 
 export class ApiService {
-  private isBatchFetching = false;
   private currentAbortController: AbortController | null = null;
 
   async fetchHealth(): Promise<{ status: string; service: string }> {
     const res = await fetch('/api/health');
     return await res.json();
   }
+
+  // --- REAL-TIME MARKET QUOTES ---
 
   async fetchQuote(symbol: string): Promise<StockQuote | null> {
     try {
@@ -29,7 +40,6 @@ export class ApiService {
   async fetchBatchQuotes(symbols: string[]): Promise<Record<string, StockQuote>> {
     if (!symbols || symbols.length === 0) return {};
 
-    // Prevent overlapping refresh requests by cancelling previous active controller
     if (this.currentAbortController) {
       this.currentAbortController.abort();
     }
@@ -37,7 +47,7 @@ export class ApiService {
     const signal = this.currentAbortController.signal;
 
     const cleanSymbols = Array.from(
-      new Set(symbols.map(s => s.trim().toUpperCase()).filter(Boolean))
+      new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))
     );
 
     const results: Record<string, StockQuote> = {};
@@ -72,11 +82,8 @@ export class ApiService {
           err?.message?.includes('aborted') ||
           err?.message?.includes('The user aborted a request')
         ) {
-          // Aborted by newer refresh or unmount, return current results
           return results;
         }
-
-        // For temporary network glitches, silently return available results and warn
         console.warn('Batch quote fetch transient warning:', err?.message || err);
       }
     }
@@ -120,6 +127,329 @@ export class ApiService {
       return null;
     }
   }
+
+  // --- WATCHLIST & STOCKS (DB IS SINGLE SOURCE OF TRUTH) ---
+
+  async fetchWatchlist(): Promise<any[]> {
+    try {
+      const res = await fetch('/api/watchlist');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.items || data.stocks || [];
+    } catch (err) {
+      console.error('fetchWatchlist error:', err);
+      return [];
+    }
+  }
+
+  async saveWatchlistItem(item: {
+    symbol: string;
+    companyName?: string;
+    sector?: string;
+    exchange?: string;
+    industry?: string;
+    upperAlert?: number | null;
+    lowerAlert?: number | null;
+    alertsEnabled?: boolean;
+    buyPrice?: number | null;
+    shares?: number | null;
+    brokerId?: string;
+  }): Promise<boolean> {
+    try {
+      const res = await fetch('/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('saveWatchlistItem error:', err);
+      return false;
+    }
+  }
+
+  async deleteWatchlistItem(symbol: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/watchlist/${encodeURIComponent(symbol)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error(`deleteWatchlistItem error for ${symbol}:`, err);
+      return false;
+    }
+  }
+
+  async clearWatchlist(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/watchlist', {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('clearWatchlist error:', err);
+      return false;
+    }
+  }
+
+  async importWatchlist(
+    stocks: any[],
+    filename?: string,
+    fileType?: string
+  ): Promise<{ success: boolean; importedCount: number; failedCount: number }> {
+    try {
+      const res = await fetch('/api/watchlist/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stocks, filename, fileType }),
+      });
+      if (!res.ok) return { success: false, importedCount: 0, failedCount: stocks.length };
+      return await res.json();
+    } catch (err) {
+      console.error('importWatchlist error:', err);
+      return { success: false, importedCount: 0, failedCount: stocks.length };
+    }
+  }
+
+  async syncAllStocks(stocks: any[]): Promise<{ success: boolean; count: number; timestamp?: number; message?: string }> {
+    try {
+      const res = await fetch('/api/stocks/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stocks }),
+      });
+      if (!res.ok) {
+        return { success: false, count: 0 };
+      }
+      return await res.json();
+    } catch (err) {
+      console.error('syncAllStocks error:', err);
+      return { success: false, count: 0 };
+    }
+  }
+
+  // Compatibility aliases
+  async fetchSqliteStocks(): Promise<any[]> {
+    return this.fetchWatchlist();
+  }
+
+  async saveSqliteStock(stock: any): Promise<boolean> {
+    return this.saveWatchlistItem(stock);
+  }
+
+  async deleteSqliteStock(symbol: string): Promise<boolean> {
+    return this.deleteWatchlistItem(symbol);
+  }
+
+  async clearAllSqliteStocks(): Promise<boolean> {
+    return this.clearWatchlist();
+  }
+
+  // --- BROKERAGE PLATFORMS ---
+
+  async fetchBrokers(): Promise<{ brokers: BrokeragePlatform[]; defaultBroker: BrokeragePlatform }> {
+    try {
+      const res = await fetch('/api/brokers');
+      if (!res.ok) throw new Error('Failed to fetch brokers');
+      const data = await res.json();
+      return {
+        brokers: data.brokers || [],
+        defaultBroker: data.defaultBroker,
+      };
+    } catch (err) {
+      console.error('fetchBrokers error:', err);
+      return { brokers: [], defaultBroker: {} as any };
+    }
+  }
+
+  async saveBroker(broker: Partial<BrokeragePlatform> & { name_ar: string; name_en: string }): Promise<BrokeragePlatform | null> {
+    try {
+      const isUpdate = Boolean(broker.id);
+      const url = isUpdate ? `/api/brokers/${encodeURIComponent(broker.id!)}` : '/api/brokers';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(broker),
+      });
+
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.broker || null;
+    } catch (err) {
+      console.error('saveBroker error:', err);
+      return null;
+    }
+  }
+
+  async deleteBroker(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/brokers/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('deleteBroker error:', err);
+      return false;
+    }
+  }
+
+  async setDefaultBroker(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/brokers/${encodeURIComponent(id)}/default`, {
+        method: 'POST',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('setDefaultBroker error:', err);
+      return false;
+    }
+  }
+
+  // --- TRADING CALCULATIONS ---
+
+  async calculateTrade(input: Partial<TradeCalculationInput>): Promise<TradeCalculationResult | null> {
+    try {
+      const res = await fetch('/api/trading/calculate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.result || null;
+    } catch (err) {
+      console.error('calculateTrade error:', err);
+      return null;
+    }
+  }
+
+  // --- PORTFOLIO & TRADES ---
+
+  async fetchPortfolioPositions(): Promise<PortfolioPosition[]> {
+    try {
+      const res = await fetch('/api/portfolio/positions');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.positions || [];
+    } catch (err) {
+      console.error('fetchPortfolioPositions error:', err);
+      return [];
+    }
+  }
+
+  async savePortfolioPosition(pos: any): Promise<PortfolioPosition | null> {
+    try {
+      const isUpdate = Boolean(pos.id);
+      const url = isUpdate ? `/api/portfolio/positions/${encodeURIComponent(pos.id)}` : '/api/portfolio/positions';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pos),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.position || null;
+    } catch (err) {
+      console.error('savePortfolioPosition error:', err);
+      return null;
+    }
+  }
+
+  async deletePortfolioPosition(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/portfolio/positions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('deletePortfolioPosition error:', err);
+      return false;
+    }
+  }
+
+  async fetchTrades(): Promise<TradeRecord[]> {
+    try {
+      const res = await fetch('/api/trades');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.trades || [];
+    } catch (err) {
+      console.error('fetchTrades error:', err);
+      return [];
+    }
+  }
+
+  async recordTrade(trade: Omit<TradeRecord, 'id'>): Promise<TradeRecord | null> {
+    try {
+      const res = await fetch('/api/trades', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trade),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.trade || null;
+    } catch (err) {
+      console.error('recordTrade error:', err);
+      return null;
+    }
+  }
+
+  // --- SETTINGS & AUDIT LOGS ---
+
+  async fetchSettings(): Promise<Record<string, string>> {
+    try {
+      const res = await fetch('/api/settings');
+      if (!res.ok) return {};
+      const data = await res.json();
+      return data.settings || {};
+    } catch (err) {
+      console.error('fetchSettings error:', err);
+      return {};
+    }
+  }
+
+  async saveSettings(settings: Record<string, any>): Promise<boolean> {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('saveSettings error:', err);
+      return false;
+    }
+  }
+
+  async fetchAuditLogs(): Promise<AuditLogRecord[]> {
+    try {
+      const res = await fetch('/api/audit-logs');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.logs || [];
+    } catch {
+      return [];
+    }
+  }
+
+  async fetchImportJobs(): Promise<ImportJobRecord[]> {
+    try {
+      const res = await fetch('/api/import-jobs');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.jobs || [];
+    } catch {
+      return [];
+    }
+  }
+
+  // --- ALERT HISTORY ---
 
   async fetchAlertHistory() {
     try {
@@ -169,98 +499,6 @@ export class ApiService {
       });
       return res.ok;
     } catch {
-      return false;
-    }
-  }
-
-  // --- SQLite Stock Persistence Endpoints ---
-
-  async fetchSqliteStocks(): Promise<any[]> {
-    try {
-      const res = await fetch('/api/stocks');
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.stocks || [];
-    } catch (err) {
-      console.error('fetchSqliteStocks error:', err);
-      return [];
-    }
-  }
-
-  async saveSqliteStock(stock: {
-    symbol: string;
-    name?: string;
-    sector?: string;
-    exchange?: string;
-    price?: number;
-    upperAlert?: number | null;
-    lowerAlert?: number | null;
-    alertsEnabled?: boolean;
-  }): Promise<boolean> {
-    try {
-      const res = await fetch('/api/stocks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(stock),
-      });
-      return res.ok;
-    } catch (err) {
-      console.error('saveSqliteStock error:', err);
-      return false;
-    }
-  }
-
-  async bulkSaveSqliteStocks(stocks: any[]): Promise<boolean> {
-    try {
-      const res = await fetch('/api/stocks/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stocks }),
-      });
-      return res.ok;
-    } catch (err) {
-      console.error('bulkSaveSqliteStocks error:', err);
-      return false;
-    }
-  }
-
-  async syncAllStocks(stocks: any[]): Promise<{ success: boolean; count: number; timestamp?: number; message?: string }> {
-    try {
-      const res = await fetch('/api/stocks/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stocks }),
-      });
-      if (!res.ok) {
-        return { success: false, count: 0 };
-      }
-      return await res.json();
-    } catch (err) {
-      console.error('syncAllStocks error:', err);
-      return { success: false, count: 0 };
-    }
-  }
-
-  async deleteSqliteStock(symbol: string): Promise<boolean> {
-    try {
-      const res = await fetch(`/api/stocks/${encodeURIComponent(symbol)}`, {
-        method: 'DELETE',
-      });
-      return res.ok;
-    } catch (err) {
-      console.error(`deleteSqliteStock error for ${symbol}:`, err);
-      return false;
-    }
-  }
-
-  async clearAllSqliteStocks(): Promise<boolean> {
-    try {
-      const res = await fetch('/api/stocks', {
-        method: 'DELETE',
-      });
-      return res.ok;
-    } catch (err) {
-      console.error('clearAllSqliteStocks error:', err);
       return false;
     }
   }

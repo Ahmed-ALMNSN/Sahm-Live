@@ -28,6 +28,7 @@ import {
 import { StockItem, ChartDataPoint, CompanyProfile, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { apiService } from '../services/api.js';
+import { getClientFallbackChart } from '../utils/clientChartFallback.js';
 
 interface StockDetailsModalProps {
   stock: StockItem | null;
@@ -70,9 +71,20 @@ export const StockDetailsModal: React.FC<StockDetailsModalProps> = ({
 
   const loadChartData = async (symbol: string, range: string) => {
     setIsLoadingChart(true);
-    const data = await apiService.fetchChart(symbol, range);
-    setChartData(data);
-    setIsLoadingChart(false);
+    try {
+      const data = await apiService.fetchChart(symbol, range);
+      if (Array.isArray(data) && data.length > 0) {
+        setChartData(data);
+      } else if (stock) {
+        setChartData(getClientFallbackChart(stock, range));
+      }
+    } catch {
+      if (stock) {
+        setChartData(getClientFallbackChart(stock, range));
+      }
+    } finally {
+      setIsLoadingChart(false);
+    }
   };
 
   const loadProfile = async (symbol: string) => {

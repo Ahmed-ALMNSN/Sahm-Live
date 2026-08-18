@@ -12,7 +12,13 @@
     "server": "tsx server.ts",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "build:exe": "vite build && electron-builder --win --x64",
+    "build:exe": "npm run build && electron-builder --win nsis portable",
+    "build:win": "npm run build && electron-builder --win nsis portable",
+    "build:mac": "npm run build && electron-builder --mac dmg zip",
+    "build:linux": "npm run build && electron-builder --linux AppImage deb",
+    "build:all": "npm run build && electron-builder -mwl",
+    "package:win": "npm run build:exe",
+    "package:all": "npm run build:all",
     "electron:dev": "cross-env NODE_ENV=development electron electron/main.cjs"
   },
   "dependencies": {

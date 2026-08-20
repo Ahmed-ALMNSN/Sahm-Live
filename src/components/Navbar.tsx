@@ -18,8 +18,7 @@ import {
   Save,
   Check,
   Calculator,
-  Briefcase,
-  Building2
+  Briefcase
 } from 'lucide-react';
 import { Language, Theme } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
@@ -39,7 +38,6 @@ interface NavbarProps {
   onOpenReport: () => void;
   onOpenCalculator?: () => void;
   onOpenPortfolio?: () => void;
-  onOpenBrokers?: () => void;
   historyCount: number;
   onManualRefresh: () => void;
   isRefreshing: boolean;
@@ -64,7 +62,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenReport,
   onOpenCalculator,
   onOpenPortfolio,
-  onOpenBrokers,
   historyCount,
   onManualRefresh,
   isRefreshing,
@@ -260,19 +257,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Briefcase className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden sm:inline">{lang === 'ar' ? 'المحفظة' : 'Portfolio'}</span>
-            </button>
-          )}
-
-          {/* Broker Platforms Button */}
-          {onOpenBrokers && (
-            <button
-              id="btn-open-brokers"
-              onClick={onOpenBrokers}
-              title={lang === 'ar' ? 'منصات وعمولات الوسطاء' : 'Broker Platforms'}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer"
-            >
-              <Building2 className="w-4 h-4 text-amber-500" />
-              <span className="hidden md:inline">{lang === 'ar' ? 'الوسطاء' : 'Brokers'}</span>
             </button>
           )}
 

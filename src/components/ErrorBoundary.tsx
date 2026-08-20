@@ -14,31 +14,27 @@ export interface ErrorBoundaryState {
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
-    this.handleRetry = this.handleRetry.bind(this);
-  }
+  override state: ErrorBoundaryState = {
+    hasError: false,
+    error: null,
+  };
 
   public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  public override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[ErrorBoundary caught error]:', error, errorInfo);
   }
 
-  public handleRetry() {
+  public handleRetry = () => {
     this.setState({ hasError: false, error: null });
     if (this.props.onReset) {
       this.props.onReset();
     }
-  }
+  };
 
-  public render() {
+  public override render() {
     if (this.state.hasError) {
       return (
         <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center my-4">
@@ -52,8 +48,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             {this.state.error?.message || this.props.fallbackMessage || 'تعذر استكمال العرض. يمكنك الضغط أدناه لإعادة المحاولة.'}
           </p>
           <button
+            type="button"
             onClick={this.handleRetry}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-white transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs font-bold hover:bg-slate-800 dark:hover:bg-white transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>إعادة المحاولة</span>

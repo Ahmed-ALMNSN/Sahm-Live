@@ -8,6 +8,7 @@ export interface StockQuote {
   high: number;
   low: number;
   volume: number;
+  mfi?: number;
   marketCap?: number;
   peRatio?: number;
   fiftyTwoWeekHigh?: number;

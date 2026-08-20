@@ -469,10 +469,54 @@ export class AnalysisService {
         if (pts.length > 0) return pts;
       }
     } catch {
-      // Fallback
+      // Proceed to Stooq real data
     }
 
-    // 3. Robust fallback
+    // 3. Try Stooq Real Historical Data
+    try {
+      const cleanSym = symbol.trim().toLowerCase();
+      const stooqUrl = `https://stooq.com/q/d/l/?s=${encodeURIComponent(cleanSym)}.us&i=d`;
+      const stooqRes = await fetch(stooqUrl, { signal: AbortSignal.timeout(6000) });
+      if (stooqRes.ok) {
+        const text = await stooqRes.text();
+        const lines = text.trim().split('\n');
+        if (lines.length > 2) {
+          const stooqPoints: any[] = [];
+          for (let i = 1; i < lines.length; i++) {
+            const parts = lines[i].split(',');
+            if (parts.length >= 6) {
+              const dateStr = parts[0];
+              const open = parseFloat(parts[1]);
+              const high = parseFloat(parts[2]);
+              const low = parseFloat(parts[3]);
+              const close = parseFloat(parts[4]);
+              const volume = parseInt(parts[5], 10) || 0;
+              if (!isNaN(close) && close > 0) {
+                const ts = new Date(dateStr).getTime();
+                stooqPoints.push({
+                  timestamp: ts,
+                  date: dateStr,
+                  open: Number((open || close).toFixed(2)),
+                  high: Number((high || close).toFixed(2)),
+                  low: Number((low || close).toFixed(2)),
+                  close: Number(close.toFixed(2)),
+                  volume,
+                  vwap: Number(close.toFixed(2)),
+                });
+              }
+            }
+          }
+          if (stooqPoints.length > 0) {
+            const limit = range === '1y' ? 250 : (range === '6mo' ? 130 : (range === '3mo' ? 65 : 30));
+            return stooqPoints.slice(-limit);
+          }
+        }
+      }
+    } catch {
+      // Proceed to fallback
+    }
+
+    // 4. Robust fallback
     try {
       const quote = await marketService.getQuote(symbol);
       return generateCalibratedChartData(symbol, range, quote);

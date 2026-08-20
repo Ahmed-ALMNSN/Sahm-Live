@@ -192,6 +192,18 @@ export class ApiService {
     }
   }
 
+  async clearAllAlerts(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/watchlist/clear-alerts', {
+        method: 'POST',
+      });
+      return res.ok;
+    } catch (err) {
+      console.error('clearAllAlerts error:', err);
+      return false;
+    }
+  }
+
   async importWatchlist(
     stocks: any[],
     filename?: string,

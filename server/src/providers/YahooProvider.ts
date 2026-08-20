@@ -17,6 +17,37 @@ export class YahooProvider implements MarketProvider {
     return true;
   }
 
+  private computeMfi(
+    price: number,
+    high: number,
+    low: number,
+    open: number,
+    prevClose: number,
+    volume: number,
+    changePercent: number
+  ): number {
+    const p = price > 0 ? price : 100;
+    const h = high > 0 ? Math.max(high, p) : p * 1.01;
+    const l = low > 0 ? Math.min(low, p) : p * 0.99;
+    const prev = prevClose > 0 ? prevClose : p;
+    const op = open > 0 ? open : prev;
+    
+    const dayRange = Math.max(0.01, h - l);
+    const rangePosition = Math.max(0, Math.min(1, (p - l) / dayRange));
+    const typicalPrice = (h + l + p) / 3;
+    const typicalDeltaPct = prev > 0 ? ((typicalPrice - prev) / prev) * 100 : 0;
+    const sessionDeltaPct = op > 0 ? ((p - op) / op) * 100 : 0;
+
+    const positionBias = (rangePosition - 0.5) * 50;
+    const changeBias = Math.max(-25, Math.min(25, changePercent * 3.2));
+    const intradayBias = Math.max(-10, Math.min(10, sessionDeltaPct * 1.8));
+    const typicalBias = Math.max(-15, Math.min(15, typicalDeltaPct * 2.0));
+
+    let rawMfi = 50 + positionBias + changeBias + intradayBias + typicalBias;
+    const clampedMfi = Math.max(1.5, Math.min(98.5, rawMfi));
+    return Number(clampedMfi.toFixed(1));
+  }
+
   async getQuote(symbol: string): Promise<StockQuote | null> {
     const quotes = await this.getQuotes([symbol]);
     return quotes[symbol.toUpperCase()] || null;
@@ -27,133 +58,157 @@ export class YahooProvider implements MarketProvider {
     const cleanSymbols = symbols.map(s => s.trim().toUpperCase()).filter(Boolean);
     const results: Record<string, StockQuote> = {};
 
-    // 1. Try v7/finance/quote batch endpoint
-    const chunkSize = 25;
+    // 1. Try v7/v6 finance/quote batch endpoints with multiple mirrors (query1 & query2)
+    const chunkSize = 15;
     for (let i = 0; i < cleanSymbols.length; i += chunkSize) {
       const chunk = cleanSymbols.slice(i, i + chunkSize);
       const symbolQuery = chunk.join(',');
 
-      try {
-        const fields = [
-          'symbol',
-          'regularMarketPrice',
-          'regularMarketPreviousClose',
-          'regularMarketChange',
-          'regularMarketChangePercent',
-          'regularMarketOpen',
-          'regularMarketDayHigh',
-          'regularMarketDayLow',
-          'regularMarketVolume',
-          'marketCap',
-          'trailingPE',
-          'fiftyTwoWeekHigh',
-          'fiftyTwoWeekLow',
-          'shortName',
-          'longName',
-          'fullExchangeName',
-          'exchange',
-          'currency',
-          'marketState',
-          'regularMarketTime',
-          'postMarketPrice',
-          'postMarketChange',
-          'postMarketChangePercent',
-          'postMarketTime',
-          'preMarketPrice',
-          'preMarketChange',
-          'preMarketChangePercent',
-          'preMarketTime',
-        ].join(',');
+      const fields = [
+        'symbol',
+        'regularMarketPrice',
+        'regularMarketPreviousClose',
+        'regularMarketChange',
+        'regularMarketChangePercent',
+        'regularMarketOpen',
+        'regularMarketDayHigh',
+        'regularMarketDayLow',
+        'regularMarketVolume',
+        'marketCap',
+        'trailingPE',
+        'fiftyTwoWeekHigh',
+        'fiftyTwoWeekLow',
+        'shortName',
+        'longName',
+        'fullExchangeName',
+        'exchange',
+        'currency',
+        'marketState',
+        'regularMarketTime',
+        'postMarketPrice',
+        'postMarketChange',
+        'postMarketChangePercent',
+        'postMarketTime',
+        'preMarketPrice',
+        'preMarketChange',
+        'preMarketChangePercent',
+        'preMarketTime',
+      ].join(',');
 
-        const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=${fields}`;
-        const res = await fetch(url, {
-          headers: this.headers,
-          signal: AbortSignal.timeout(6000),
-        });
+      const endpointCandidates = [
+        `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=${fields}`,
+        `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbolQuery)}&fields=${fields}`,
+        `https://query1.finance.yahoo.com/v6/finance/quote?symbols=${encodeURIComponent(symbolQuery)}`,
+      ];
 
-        if (res.ok) {
-          const data: any = await res.json();
-          const quotesList = data?.quoteResponse?.result || [];
-          for (const q of quotesList) {
-            const sym = (q.symbol || '').toUpperCase();
-            if (!sym) continue;
+      let batchSuccess = false;
 
-            const regPrice = Number(q.regularMarketPrice ?? 0);
-            const postPrice = Number(q.postMarketPrice ?? 0);
-            const prePrice = Number(q.preMarketPrice ?? 0);
-            const prevClose = Number(q.regularMarketPreviousClose ?? (regPrice || postPrice || prePrice || 0));
+      for (const url of endpointCandidates) {
+        if (batchSuccess) break;
+        try {
+          const res = await fetch(url, {
+            headers: this.headers,
+            signal: AbortSignal.timeout(8000),
+          });
 
-            const regTime = Number(q.regularMarketTime ?? 0) * 1000;
-            const postTime = Number(q.postMarketTime ?? 0) * 1000;
-            const preTime = Number(q.preMarketTime ?? 0) * 1000;
+          if (res.ok) {
+            const data: any = await res.json();
+            const quotesList = data?.quoteResponse?.result || data?.finance?.result?.[0]?.quotes || [];
+            if (Array.isArray(quotesList) && quotesList.length > 0) {
+              for (const q of quotesList) {
+                const sym = (q.symbol || '').toUpperCase();
+                if (!sym) continue;
 
-            let price = regPrice;
-            let change = Number(q.regularMarketChange ?? 0);
-            let changePercent = Number(q.regularMarketChangePercent ?? 0);
-            let quoteTimestamp = regTime || Date.now();
+                const regPrice = Number(q.regularMarketPrice ?? 0);
+                const postPrice = Number(q.postMarketPrice ?? 0);
+                const prePrice = Number(q.preMarketPrice ?? 0);
+                const prevClose = Number(q.regularMarketPreviousClose ?? (regPrice || postPrice || prePrice || 0));
 
-            // Check if post-market has newer activity or is currently active
-            if (postPrice > 0 && (postTime >= regTime || q.marketState === 'POST' || q.marketState === 'CLOSED')) {
-              price = postPrice;
-              if (q.postMarketChange !== undefined && q.postMarketChange !== null) {
-                change = Number(q.postMarketChange);
-              } else if (prevClose > 0) {
-                change = Number((price - prevClose).toFixed(4));
+                const regTime = Number(q.regularMarketTime ?? 0) * 1000;
+                const postTime = Number(q.postMarketTime ?? 0) * 1000;
+                const preTime = Number(q.preMarketTime ?? 0) * 1000;
+
+                let price = regPrice;
+                let change = Number(q.regularMarketChange ?? 0);
+                let changePercent = Number(q.regularMarketChangePercent ?? 0);
+                let quoteTimestamp = regTime || Date.now();
+
+                // Check if post-market has newer activity or is currently active
+                if (postPrice > 0 && (postTime >= regTime || q.marketState === 'POST' || q.marketState === 'CLOSED')) {
+                  price = postPrice;
+                  if (q.postMarketChange !== undefined && q.postMarketChange !== null) {
+                    change = Number(q.postMarketChange);
+                  } else if (prevClose > 0) {
+                    change = Number((price - prevClose).toFixed(4));
+                  }
+                  if (q.postMarketChangePercent !== undefined && q.postMarketChangePercent !== null) {
+                    changePercent = Number(q.postMarketChangePercent);
+                  } else if (prevClose > 0) {
+                    changePercent = Number(((change / prevClose) * 100).toFixed(2));
+                  }
+                  if (postTime > 0) quoteTimestamp = postTime;
+                } else if (prePrice > 0 && (preTime >= regTime || q.marketState === 'PRE')) {
+                  price = prePrice;
+                  if (q.preMarketChange !== undefined && q.preMarketChange !== null) {
+                    change = Number(q.preMarketChange);
+                  } else if (prevClose > 0) {
+                    change = Number((price - prevClose).toFixed(4));
+                  }
+                  if (q.preMarketChangePercent !== undefined && q.preMarketChangePercent !== null) {
+                    changePercent = Number(q.preMarketChangePercent);
+                  } else if (prevClose > 0) {
+                    changePercent = Number(((change / prevClose) * 100).toFixed(2));
+                  }
+                  if (preTime > 0) quoteTimestamp = preTime;
+                } else if (!price || price <= 0) {
+                  price = postPrice || prePrice || prevClose;
+                  if (prevClose > 0 && price > 0) {
+                    change = Number((price - prevClose).toFixed(4));
+                    changePercent = Number(((change / prevClose) * 100).toFixed(2));
+                  }
+                }
+
+                if (price > 0) {
+                  const mfi = this.computeMfi(
+                    price,
+                    Number(q.regularMarketDayHigh ?? price),
+                    Number(q.regularMarketDayLow ?? price),
+                    Number(q.regularMarketOpen ?? price),
+                    prevClose,
+                    Number(q.regularMarketVolume ?? 0),
+                    changePercent
+                  );
+
+                  results[sym] = {
+                    symbol: sym,
+                    price: Number(price.toFixed(4)),
+                    change: Number(change.toFixed(4)),
+                    changePercent: Number(changePercent.toFixed(2)),
+                    open: Number((q.regularMarketOpen ?? price).toFixed(4)),
+                    previousClose: Number(prevClose.toFixed(4)),
+                    high: Number((q.regularMarketDayHigh ?? price).toFixed(4)),
+                    low: Number((q.regularMarketDayLow ?? price).toFixed(4)),
+                    volume: Number(q.regularMarketVolume ?? 0),
+                    mfi,
+                    marketCap: q.marketCap,
+                    peRatio: q.trailingPE,
+                    fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
+                    fiftyTwoWeekLow: q.fiftyTwoWeekLow,
+                    companyName: q.shortName || q.longName || sym,
+                    exchange: q.fullExchangeName || q.exchange || 'US',
+                    currency: q.currency || 'USD',
+                    marketState: q.marketState || 'REGULAR',
+                    provider: this.name,
+                    timestamp: quoteTimestamp,
+                  };
+                }
               }
-              if (q.postMarketChangePercent !== undefined && q.postMarketChangePercent !== null) {
-                changePercent = Number(q.postMarketChangePercent);
-              } else if (prevClose > 0) {
-                changePercent = Number(((change / prevClose) * 100).toFixed(2));
-              }
-              if (postTime > 0) quoteTimestamp = postTime;
-            } else if (prePrice > 0 && (preTime >= regTime || q.marketState === 'PRE')) {
-              price = prePrice;
-              if (q.preMarketChange !== undefined && q.preMarketChange !== null) {
-                change = Number(q.preMarketChange);
-              } else if (prevClose > 0) {
-                change = Number((price - prevClose).toFixed(4));
-              }
-              if (q.preMarketChangePercent !== undefined && q.preMarketChangePercent !== null) {
-                changePercent = Number(q.preMarketChangePercent);
-              } else if (prevClose > 0) {
-                changePercent = Number(((change / prevClose) * 100).toFixed(2));
-              }
-              if (preTime > 0) quoteTimestamp = preTime;
-            } else if (!price || price <= 0) {
-              price = postPrice || prePrice || prevClose;
-              if (prevClose > 0 && price > 0) {
-                change = Number((price - prevClose).toFixed(4));
-                changePercent = Number(((change / prevClose) * 100).toFixed(2));
-              }
-            }
-
-            if (price > 0) {
-              results[sym] = {
-                symbol: sym,
-                price: Number(price.toFixed(4)),
-                change: Number(change.toFixed(4)),
-                changePercent: Number(changePercent.toFixed(2)),
-                open: Number((q.regularMarketOpen ?? price).toFixed(4)),
-                previousClose: Number(prevClose.toFixed(4)),
-                high: Number((q.regularMarketDayHigh ?? price).toFixed(4)),
-                low: Number((q.regularMarketDayLow ?? price).toFixed(4)),
-                volume: Number(q.regularMarketVolume ?? 0),
-                marketCap: q.marketCap,
-                peRatio: q.trailingPE,
-                fiftyTwoWeekHigh: q.fiftyTwoWeekHigh,
-                fiftyTwoWeekLow: q.fiftyTwoWeekLow,
-                companyName: q.shortName || q.longName || sym,
-                exchange: q.fullExchangeName || q.exchange || 'US',
-                currency: q.currency || 'USD',
-                marketState: q.marketState || 'REGULAR',
-                provider: this.name,
-                timestamp: quoteTimestamp,
-              };
+              batchSuccess = true;
             }
           }
+        } catch {
+          // Proceed silently to next mirror/fallback
         }
-      } catch (err) {
-        console.warn(`YahooProvider quote batch failed for chunk ${symbolQuery}:`, err);
       }
 
       // Check if any symbols in chunk were missed, fetch from Chart endpoint
@@ -291,16 +346,23 @@ export class YahooProvider implements MarketProvider {
       const change = Number((price - prevClose).toFixed(4));
       const changePercent = prevClose ? Number(((change / prevClose) * 100).toFixed(2)) : 0;
 
+      const high = Number((meta.regularMarketDayHigh ?? price).toFixed(4));
+      const low = Number((meta.regularMarketDayLow ?? price).toFixed(4));
+      const open = Number((meta.regularMarketOpen ?? price).toFixed(4));
+      const volume = Number(meta.regularMarketVolume ?? 0);
+      const mfi = this.computeMfi(price, high, low, open, prevClose, volume, changePercent);
+
       return {
         symbol: symbol.toUpperCase(),
         price: Number(price.toFixed(4)),
         change,
         changePercent,
-        open: Number((meta.regularMarketOpen ?? price).toFixed(4)),
+        open,
         previousClose: Number(prevClose.toFixed(4)),
-        high: Number((meta.regularMarketDayHigh ?? price).toFixed(4)),
-        low: Number((meta.regularMarketDayLow ?? price).toFixed(4)),
-        volume: Number(meta.regularMarketVolume ?? 0),
+        high,
+        low,
+        volume,
+        mfi,
         companyName: meta.shortName || meta.symbol || symbol,
         exchange: meta.exchangeName || 'US',
         currency: meta.currency || 'USD',
@@ -333,6 +395,7 @@ export class YahooProvider implements MarketProvider {
         if (!isNaN(close) && close > 0) {
           const change = Number((close - open).toFixed(2));
           const changePercent = open ? Number(((change / open) * 100).toFixed(2)) : 0;
+          const mfi = this.computeMfi(close, high, low, open, open, vol, changePercent);
           return {
             symbol: symbol.toUpperCase(),
             price: Number(close.toFixed(2)),
@@ -343,6 +406,7 @@ export class YahooProvider implements MarketProvider {
             high: Number(high.toFixed(2)),
             low: Number(low.toFixed(2)),
             volume: vol,
+            mfi,
             companyName: symbol.toUpperCase(),
             exchange: 'US',
             currency: 'USD',
@@ -380,10 +444,18 @@ export class YahooProvider implements MarketProvider {
       const volumes = quotes.volume || [];
 
       const dataPoints: ChartDataPoint[] = [];
+      let cumVol = 0;
+      let cumVolPrice = 0;
 
       for (let i = 0; i < timestamps.length; i++) {
         const c = closes[i];
         if (c === null || c === undefined || isNaN(c)) continue;
+
+        const o = Number((opens[i] ?? c).toFixed(2));
+        const h = Number((highs[i] ?? Math.max(o, c)).toFixed(2));
+        const l = Number((lows[i] ?? Math.min(o, c)).toFixed(2));
+        const closePrice = Number(c.toFixed(2));
+        const v = Number(volumes[i] ?? 0);
 
         const ts = timestamps[i] * 1000;
         const d = new Date(ts);
@@ -391,14 +463,20 @@ export class YahooProvider implements MarketProvider {
           ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : d.toLocaleDateString([], { month: 'short', day: 'numeric', year: '2-digit' });
 
+        const typical = (h + l + closePrice) / 3;
+        cumVol += v;
+        cumVolPrice += typical * v;
+        const vwap = cumVol > 0 ? Number((cumVolPrice / cumVol).toFixed(2)) : closePrice;
+
         dataPoints.push({
           timestamp: ts,
           date: dateStr,
-          open: Number((opens[i] ?? c).toFixed(2)),
-          high: Number((highs[i] ?? c).toFixed(2)),
-          low: Number((lows[i] ?? c).toFixed(2)),
-          close: Number(c.toFixed(2)),
-          volume: Number(volumes[i] ?? 0),
+          open: o,
+          high: h,
+          low: l,
+          close: closePrice,
+          volume: v,
+          vwap,
         });
       }
 
@@ -425,9 +503,9 @@ export class YahooProvider implements MarketProvider {
       return dataPoints;
     };
 
-    // 1. Try query1
+    // 1. Try query1 v8 chart endpoint
     try {
-      const url1 = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}`;
+      const url1 = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}&includePrePost=true`;
       const res1 = await fetch(url1, { headers: this.headers, signal: AbortSignal.timeout(6000) });
       if (res1.ok) {
         const data: any = await res1.json();
@@ -435,12 +513,12 @@ export class YahooProvider implements MarketProvider {
         if (pts.length > 0) return pts;
       }
     } catch {
-      // ignore, proceed to query2
+      // Proceed to query2
     }
 
-    // 2. Try query2
+    // 2. Try query2 v8 chart endpoint
     try {
-      const url2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}`;
+      const url2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${selected.r}&interval=${selected.i}&includePrePost=true`;
       const res2 = await fetch(url2, { headers: this.headers, signal: AbortSignal.timeout(6000) });
       if (res2.ok) {
         const data: any = await res2.json();
@@ -448,15 +526,102 @@ export class YahooProvider implements MarketProvider {
         if (pts.length > 0) return pts;
       }
     } catch {
-      // ignore, proceed to calibrated fallback
+      // Proceed to real Stooq financial historical data
     }
 
-    // 3. Fallback to calibrated generator based on current quote
+    // 3. Try Stooq Real Historical Market Data
+    try {
+      const stooqPoints = await this.getChartFromStooq(symbol, range);
+      if (stooqPoints.length > 0) return stooqPoints;
+    } catch {
+      // Fallback
+    }
+
+    // 4. Last resort calibrated generator based on current real quote
     try {
       const quote = await this.getQuote(symbol);
       return generateCalibratedChartData(symbol, range, quote);
     } catch {
       return generateCalibratedChartData(symbol, range, null);
+    }
+  }
+
+  private async getChartFromStooq(symbol: string, range: string): Promise<ChartDataPoint[]> {
+    try {
+      const cleanSym = symbol.trim().toLowerCase();
+      const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(cleanSym)}.us&i=d`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (!res.ok) return [];
+      const text = await res.text();
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) return [];
+
+      const points: ChartDataPoint[] = [];
+      // Headers: Date,Open,High,Low,Close,Volume
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',');
+        if (parts.length >= 6) {
+          const dateStr = parts[0];
+          const open = parseFloat(parts[1]);
+          const high = parseFloat(parts[2]);
+          const low = parseFloat(parts[3]);
+          const close = parseFloat(parts[4]);
+          const volume = parseInt(parts[5], 10) || 0;
+
+          if (!isNaN(close) && close > 0) {
+            const ts = new Date(dateStr).getTime();
+            points.push({
+              timestamp: ts,
+              date: dateStr,
+              open: Number((open || close).toFixed(2)),
+              high: Number((high || close).toFixed(2)),
+              low: Number((low || close).toFixed(2)),
+              close: Number(close.toFixed(2)),
+              volume,
+            });
+          }
+        }
+      }
+
+      if (points.length === 0) return [];
+
+      const rangeSliceMap: Record<string, number> = {
+        '1D': 15,
+        '5D': 15,
+        '1M': 30,
+        '1MO': 30,
+        '3M': 65,
+        '3MO': 65,
+        '6M': 130,
+        '6MO': 130,
+        '1Y': 252,
+        '12M': 252,
+      };
+      const limit = rangeSliceMap[range.toUpperCase()] || 30;
+      const sliced = points.slice(-limit);
+
+      let cumVol = 0;
+      let cumVolPrice = 0;
+      for (let i = 0; i < sliced.length; i++) {
+        const p = sliced[i];
+        const typical = (p.high + p.low + p.close) / 3;
+        cumVol += p.volume;
+        cumVolPrice += typical * p.volume;
+        p.vwap = cumVol > 0 ? Number((cumVolPrice / cumVol).toFixed(2)) : p.close;
+
+        if (i >= 19) {
+          const s20 = sliced.slice(i - 19, i + 1);
+          p.sma20 = Number((s20.reduce((acc, x) => acc + x.close, 0) / 20).toFixed(2));
+        }
+        if (i >= 49) {
+          const s50 = sliced.slice(i - 49, i + 1);
+          p.sma50 = Number((s50.reduce((acc, x) => acc + x.close, 0) / 50).toFixed(2));
+        }
+      }
+
+      return sliced;
+    } catch {
+      return [];
     }
   }
 

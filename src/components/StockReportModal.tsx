@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { 
   Printer, 
   X, 
@@ -9,11 +9,13 @@ import {
   Activity, 
   FileText,
   CheckCircle2,
-  ShieldCheck
+  ShieldCheck,
+  FileDown
 } from 'lucide-react';
 import { StockItem, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { BowArrowIcon } from './BowArrowIcon.js';
+import { exportElementToPdf } from '../utils/pdfExport.js';
 
 interface StockReportModalProps {
   isOpen: boolean;
@@ -29,6 +31,8 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
   lang,
 }) => {
   const t = getTranslation(lang);
+  const [isExporting, setIsExporting] = useState(false);
+  const printableAreaRef = useRef<HTMLDivElement>(null);
 
   const reportDate = useMemo(() => {
     return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA' : 'en-US', {
@@ -87,6 +91,19 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
     window.print();
   };
 
+  const handleExportPdf = async () => {
+    if (!printableAreaRef.current) return;
+    setIsExporting(true);
+    try {
+      const fileName = `Sahm_Market_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+      await exportElementToPdf(printableAreaRef.current, { fileName });
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -112,11 +129,21 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              id="btn-export-pdf-action"
+              onClick={handleExportPdf}
+              disabled={isExporting}
+              className="px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white shadow-md active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer disabled:opacity-50"
+            >
+              <FileDown className={`w-4 h-4 text-emerald-400 ${isExporting ? 'animate-bounce' : ''}`} />
+              <span>{isExporting ? (lang === 'ar' ? 'جاري التحميل...' : 'Exporting...') : (lang === 'ar' ? 'تحميل PDF' : 'Download PDF')}</span>
+            </button>
+
             <button
               id="btn-print-action"
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2 font-sans"
+              className="px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>{t.report.btnPrint}</span>
@@ -125,7 +152,7 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
             <button
               id="btn-close-report"
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -133,7 +160,7 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
         </div>
 
         {/* Printable Report Content Body */}
-        <div className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-slate-50/50 dark:bg-[#0a0b0d] print:bg-white print:text-black">
+        <div ref={printableAreaRef} className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-slate-50/50 dark:bg-[#0a0b0d] print:bg-white print:text-black">
           
           {/* Executive Report Brand Header */}
           <div className="border-b border-slate-200 dark:border-slate-800 print:border-slate-300 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

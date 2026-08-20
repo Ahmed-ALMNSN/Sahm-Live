@@ -19,6 +19,7 @@ export type SortField =
   | 'price' 
   | 'changePercent' 
   | 'volume' 
+  | 'mfi'
   | 'dayHigh' 
   | 'dayLow' 
   | 'upperAlert' 
@@ -66,6 +67,7 @@ export interface StockQuote {
   high: number;
   low: number;
   volume: number;
+  mfi?: number;
   marketCap?: number;
   peRatio?: number;
   fiftyTwoWeekHigh?: number;
@@ -92,6 +94,7 @@ export interface StockItem {
   dayHigh: number;
   dayLow: number;
   volume: number;
+  mfi?: number;
   marketCap?: number;
   peRatio?: number;
   fiftyTwoWeekHigh?: number;

@@ -43,7 +43,7 @@ export const CalculatorModal: React.FC<CalculatorModalProps> = ({
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {lang === 'ar'
-                  ? 'حساب نقطة التعادل، الأرباح الصافية، والعمولات لكافة المنصات المالية مع قرار الشراء الذكي والتعليل العلمي'
+                  ? 'حساب نقطة التعادل، الأرباح الصافية، والعمولات لكافة المنصات المالية مع قرار الشراء الذكي والتحليل العلمي'
                   : 'Calculate break-even prices, net profits, and actionable buy/wait decisions with scientific reasoning'}
               </p>
             </div>

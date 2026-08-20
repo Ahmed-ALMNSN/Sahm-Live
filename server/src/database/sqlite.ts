@@ -862,6 +862,28 @@ export class SqliteDatabase {
     }
   }
 
+  clearAllAlerts(watchlistId = 'default_watchlist'): boolean {
+    if (!this.db) return false;
+    try {
+      const now = Date.now();
+      const stmt = this.db.prepare(`
+        UPDATE watchlist_items 
+        SET upper_alert = NULL, lower_alert = NULL, updated_at = ?
+        WHERE watchlist_id = ?;
+      `);
+      stmt.run([now, watchlistId]);
+      stmt.free();
+
+      this.recordAuditLog('default_user', 'CLEAR_ALL_ALERTS', 'watchlist_items', watchlistId);
+      this.saveToDisk();
+      console.log(`[SQLite] Cleared all alerts (upper & lower) in watchlist ${watchlistId}`);
+      return true;
+    } catch (err) {
+      console.error('[SQLite] Error clearing all alerts:', err);
+      return false;
+    }
+  }
+
   importWatchlistStocks(
     stocks: Array<{
       symbol: string;

@@ -393,6 +393,20 @@ async function startServer() {
     }
   });
 
+  // Clear all alerts from watchlist items (reset upper and lower alerts to null)
+  const handleClearAlerts = (req: Request, res: Response) => {
+    try {
+      const success = sqliteDb.clearAllAlerts();
+      res.json({ success, message: 'All alert thresholds cleared and reset to null/zero' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: { code: 'CLEAR_ALERTS_ERROR', message: err.message } });
+    }
+  };
+
+  app.post('/api/watchlist/clear-alerts', handleClearAlerts);
+  app.delete('/api/watchlist/alerts', handleClearAlerts);
+  app.post('/api/stocks/clear-alerts', handleClearAlerts);
+
   // Compatibility routes for /api/stocks
   app.get('/api/stocks', (req: Request, res: Response) => {
     const items = sqliteDb.getWatchlist();

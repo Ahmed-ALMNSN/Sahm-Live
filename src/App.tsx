@@ -19,10 +19,10 @@ import { AlertNotificationBanner } from './components/AlertNotificationBanner.js
 import { StockReportModal } from './components/StockReportModal.js';
 import { CalculatorModal } from './components/CalculatorModal.js';
 import { PortfolioModal } from './components/PortfolioModal.js';
-import { BrokerManagementModal } from './components/BrokerManagementModal.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { alertEngine } from './utils/alertEngine.js';
 import { apiService } from './services/api.js';
+import { calculateStockMfi } from './utils/moneyFlow.js';
 
 const DEFAULT_STOCKS: StockItem[] = [
   {
@@ -227,7 +227,6 @@ export default function App() {
   const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
   const [calculatorStockSymbol, setCalculatorStockSymbol] = useState<string | null>(null);
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
-  const [isBrokersModalOpen, setIsBrokersModalOpen] = useState(false);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string | null>(null);
 
   // Ref lock to prevent overlapping quote batches
@@ -357,6 +356,18 @@ export default function App() {
           flash = quote.price > item.price ? 'up' : 'down';
         }
 
+        const calculatedMfi = quote.mfi !== undefined 
+          ? quote.mfi 
+          : calculateStockMfi(
+              quote.price,
+              quote.high || item.dayHigh || quote.price,
+              quote.low || item.dayLow || quote.price,
+              quote.open || item.open || quote.price,
+              quote.previousClose || item.previousClose || quote.price,
+              quote.volume || item.volume || 0,
+              quote.changePercent
+            ).mfi;
+
         const candidateStock: StockItem = {
           ...item,
           companyName: quote.companyName || item.companyName || item.symbol,
@@ -369,6 +380,7 @@ export default function App() {
           dayHigh: quote.high || item.dayHigh,
           dayLow: quote.low || item.dayLow,
           volume: quote.volume || item.volume,
+          mfi: calculatedMfi,
           marketCap: quote.marketCap ?? item.marketCap,
           peRatio: quote.peRatio ?? item.peRatio,
           exchange: quote.exchange || item.exchange,
@@ -578,6 +590,24 @@ export default function App() {
     const msg = lang === 'ar' 
       ? 'تم الحذف النهائي لجميع الأسهم من قاعدة البيانات بنجاح'
       : 'All stocks permanently deleted from database';
+    showActionToast(msg, 'info');
+  };
+
+  const handleClearAllAlerts = () => {
+    setHasUnsavedChanges(true);
+    setStocks(prev => prev.map(s => ({
+      ...s,
+      upperAlert: null,
+      lowerAlert: null,
+      upperCrossedState: false,
+      lowerCrossedState: false,
+    })));
+    setActiveToasts([]);
+    apiService.clearAllAlerts();
+
+    const msg = lang === 'ar'
+      ? 'تم حذف وتصفير جميع التنبيهات من كافة الأسهم وإعادتها للصفر بنجاح'
+      : 'All alert thresholds cleared and reset to zero/blank across all stocks';
     showActionToast(msg, 'info');
   };
 
@@ -795,7 +825,6 @@ export default function App() {
         onOpenReport={() => setIsReportModalOpen(true)}
         onOpenCalculator={() => setIsCalculatorModalOpen(true)}
         onOpenPortfolio={() => setIsPortfolioModalOpen(true)}
-        onOpenBrokers={() => setIsBrokersModalOpen(true)}
         historyCount={alertHistory.length}
         onManualRefresh={fetchMarketQuotes}
         isRefreshing={isRefreshing}
@@ -826,6 +855,7 @@ export default function App() {
           onUpdateAlerts={handleUpdateAlerts}
           onDeleteStock={handleDeleteStock}
           onClearAllStocks={handleClearAllStocks}
+          onClearAllAlerts={handleClearAllAlerts}
           onSelectStock={(sym) => setSelectedStockSymbol(sym)}
           onTestTriggerAlert={handleTestTriggerAlert}
           onOpenCalculator={(stock) => {
@@ -883,6 +913,7 @@ export default function App() {
           isOpen={Boolean(selectedStockSymbol)}
           onClose={() => setSelectedStockSymbol(null)}
           lang={lang}
+          theme={theme}
           onUpdateAlerts={handleUpdateAlerts}
         />
       </ErrorBoundary>
@@ -911,14 +942,6 @@ export default function App() {
         <PortfolioModal
           isOpen={isPortfolioModalOpen}
           onClose={() => setIsPortfolioModalOpen(false)}
-        />
-      </ErrorBoundary>
-
-      {/* Broker Platforms Modal */}
-      <ErrorBoundary fallbackTitle="تعذر فتح إدارة المنصات المالية">
-        <BrokerManagementModal
-          isOpen={isBrokersModalOpen}
-          onClose={() => setIsBrokersModalOpen(false)}
         />
       </ErrorBoundary>
 

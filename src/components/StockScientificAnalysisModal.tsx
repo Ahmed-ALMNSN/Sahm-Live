@@ -32,7 +32,9 @@ import {
   Lock,
   ArrowRight,
   TrendingDown as BearishIcon,
-  Calculator
+  Calculator,
+  Radio,
+  FileDown
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -49,10 +51,11 @@ import {
   Cell,
   ComposedChart
 } from 'recharts';
-import { StockItem, Language } from '../types.js';
+import { StockItem, Language, Theme } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { apiService } from '../services/api.js';
 import { getClientFallbackChart } from '../utils/clientChartFallback.js';
+import { TradingViewStyleChart } from './TradingViewStyleChart.js';
 import {
   runScientificAnalysis,
   QuantitativeAnalysisResult,
@@ -61,33 +64,38 @@ import {
 } from '../utils/quantitativeEngine.js';
 import { ErrorBoundary } from './ErrorBoundary.js';
 import { TradingCalculator } from './TradingCalculator.js';
+import { StockIntradayDashboard } from './StockIntradayDashboard.js';
+import { StockAnalysisPdfModal } from './StockAnalysisPdfModal.js';
 
 interface StockScientificAnalysisModalProps {
   stock: StockItem | null;
   isOpen: boolean;
   onClose: () => void;
   lang: Language;
+  theme?: Theme;
   onUpdateAlerts: (symbol: string, upperAlert: number | null, lowerAlert: number | null, alertsEnabled: boolean) => void;
 }
 
-type TabType = 'DECISION' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS' | 'CALCULATOR';
+type TabType = 'DASHBOARD' | 'DECISION' | 'CALCULATOR' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS';
 
 export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModalProps> = ({
   stock,
   isOpen,
   onClose,
   lang,
+  theme,
   onUpdateAlerts,
 }) => {
   const t = getTranslation(lang);
 
-  const [activeTab, setActiveTab] = useState<TabType>('DECISION');
+  const [activeTab, setActiveTab] = useState<TabType>('DASHBOARD');
   const [selectedRange, setSelectedRange] = useState<string>('1D');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [fullData, setFullData] = useState<any>(null);
   const [userWeights, setUserWeights] = useState<QuantitativeConfig['weights']>(DEFAULT_CONFIG.weights);
   const [showCustomWeights, setShowCustomWeights] = useState<boolean>(false);
   const [isMaximized, setIsMaximized] = useState<boolean>(true);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
 
   // Alert Inputs
   const [upperVal, setUpperVal] = useState<string>('');
@@ -181,6 +189,17 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
     return runScientificAnalysis(mergedData, { weights: userWeights });
   }, [stock, fullData, userWeights]);
 
+  // Active chart series based on selectedRange with fallback (Hook 15 - must be before any early return)
+  const activeChartSeries = useMemo(() => {
+    if (fullData?.charts?.[selectedRange] && fullData.charts[selectedRange].length > 0) {
+      return fullData.charts[selectedRange];
+    }
+    if (stock) {
+      return getClientFallbackChart(stock, selectedRange);
+    }
+    return [];
+  }, [fullData?.charts, selectedRange, stock]);
+
   if (!isOpen || !stock || !analysis) return null;
 
   const isAr = lang === 'ar';
@@ -202,17 +221,6 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
   const handlePrint = () => {
     window.print();
   };
-
-  // Active chart series based on selectedRange with fallback
-  const activeChartSeries = useMemo(() => {
-    if (fullData?.charts?.[selectedRange] && fullData.charts[selectedRange].length > 0) {
-      return fullData.charts[selectedRange];
-    }
-    if (stock) {
-      return getClientFallbackChart(stock, selectedRange);
-    }
-    return [];
-  }, [fullData?.charts, selectedRange, stock]);
 
   // Decision Badging Helper
   const getDecisionBadge = (decision: string) => {
@@ -260,29 +268,29 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-2.5 bg-black/80 backdrop-blur-md overflow-y-auto animate-fade-in font-sans"
     >
-      <div className={`bg-[#0a0d13] text-slate-100 rounded-2xl border border-slate-800 shadow-2xl w-full flex flex-col overflow-hidden animate-slide-in font-sans transition-all duration-200 ${
-        isMaximized ? 'max-w-[99vw] h-[97vh]' : 'max-w-6xl max-h-[92vh]'
+      <div className={`bg-white dark:bg-[#0a0d13] text-slate-900 dark:text-slate-100 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full flex flex-col overflow-hidden animate-slide-in font-sans transition-all duration-200 ${
+        isMaximized ? 'max-w-[99vw] h-[98vh]' : 'max-w-7xl w-full h-[94vh] max-h-[96vh]'
       }`}>
         
         {/* Header Bar */}
-        <div className="px-4 sm:px-6 py-3.5 border-b border-slate-800/80 bg-[#11151e] flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 sm:px-6 py-3.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-100 dark:bg-[#11151e] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 sm:p-3 rounded-xl border ${isPositive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'}`}>
+            <div className={`p-2.5 sm:p-3 rounded-xl border ${isPositive ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400'}`}>
               {isPositive ? <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6" /> : <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl sm:text-2xl font-bold font-mono text-white tracking-wider">
+                <span className="text-xl sm:text-2xl font-bold font-mono text-slate-900 dark:text-white tracking-wider">
                   {analysis.symbol}
                 </span>
-                <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">
+                <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono border border-slate-300 dark:border-slate-700">
                   {fullData?.exchange || stock.exchange || 'US Market'}
                 </span>
-                <span className="text-xs text-slate-400 hidden md:inline">
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden md:inline">
                   • {fullData?.sector || stock.sector || 'General Market'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 truncate max-w-xs sm:max-w-md">
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-md">
                 {fullData?.companyName || stock.companyName || analysis.symbol}
               </p>
             </div>
@@ -291,41 +299,50 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
           <div className="flex items-center gap-3 sm:gap-5">
             {/* Live Price Block */}
             <div className="text-right rtl:text-left">
-              <div className="text-xl sm:text-2xl font-black font-mono text-white flex items-center gap-1.5 justify-end">
+              <div className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white flex items-center gap-1.5 justify-end">
                 <span>${analysis.price.toFixed(2)}</span>
               </div>
-              <div className={`text-xs font-mono font-bold flex items-center justify-end gap-1.5 ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <div className={`text-xs font-mono font-bold flex items-center justify-end gap-1.5 ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 <span>{isPositive ? '+' : ''}${analysis.change.toFixed(2)}</span>
                 <span>({isPositive ? '+' : ''}{analysis.changePercent.toFixed(2)}%)</span>
               </div>
             </div>
 
             {/* Quick Actions */}
-            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800 rtl:border-l-0 rtl:border-r rtl:pr-2">
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800 rtl:border-l-0 rtl:border-r rtl:pr-2">
+              <button
+                type="button"
+                onClick={() => setIsPdfModalOpen(true)}
+                title={isAr ? 'تصدير تقرير التحليل والداشبورد إلى PDF' : 'Export Analysis Dossier to PDF'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-900/30 transition cursor-pointer"
+              >
+                <FileDown className="w-4 h-4" />
+                <span className="hidden sm:inline">{isAr ? 'تصدير PDF' : 'Export PDF'}</span>
+              </button>
               <button
                 onClick={() => setIsMaximized(!isMaximized)}
                 title={isMaximized ? (isAr ? 'استعادة الحجم العادي' : 'Restore Size') : (isAr ? 'تكبير ملء الشاشة' : 'Maximize Fullscreen')}
-                className="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                className="p-2 rounded-xl bg-slate-200/70 dark:bg-slate-800/70 hover:bg-slate-300 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700/60 transition"
               >
-                {isMaximized ? <Minimize2 className="w-4 h-4 text-emerald-400" /> : <Maximize2 className="w-4 h-4" />}
+                {isMaximized ? <Minimize2 className="w-4 h-4 text-emerald-500 dark:text-emerald-400" /> : <Maximize2 className="w-4 h-4" />}
               </button>
               <button
                 onClick={() => loadAnalysisData(analysis.symbol)}
                 title={isAr ? 'تحديث البيانات فوراً' : 'Refresh Realtime Data'}
-                className="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                className="p-2 rounded-xl bg-slate-200/70 dark:bg-slate-800/70 hover:bg-slate-300 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700/60 transition"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-emerald-400' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-emerald-500 dark:text-emerald-400' : ''}`} />
               </button>
               <button
                 onClick={handlePrint}
                 title={isAr ? 'طباعة التقرير الاستشاري' : 'Print Advisory Report'}
-                className="p-2 rounded-xl bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/60 transition"
+                className="p-2 rounded-xl bg-slate-200/70 dark:bg-slate-800/70 hover:bg-slate-300 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-700/60 transition"
               >
                 <Printer className="w-4 h-4" />
               </button>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl bg-slate-800/70 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 border border-slate-700/60 transition"
+                className="p-2 rounded-xl bg-slate-200/70 dark:bg-slate-800/70 hover:bg-rose-500/20 text-slate-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 border border-slate-300 dark:border-slate-700/60 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -334,8 +351,9 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
         </div>
 
         {/* Tab Navigation Bar */}
-        <div className="px-3 sm:px-6 bg-[#0d1017] border-b border-slate-800/90 flex items-center gap-1 overflow-x-auto no-scrollbar">
+        <div className="px-3 sm:px-6 bg-slate-50 dark:bg-[#0d1017] border-b border-slate-200 dark:border-slate-800/90 flex items-center gap-1 overflow-x-auto no-scrollbar">
           {[
+            { id: 'DASHBOARD', label: isAr ? 'الداشبورد المباشر والشارت' : 'Live Dashboard & Charts', icon: <Radio className="w-4 h-4 text-emerald-500" /> },
             { id: 'DECISION', label: isAr ? 'القرار والاستشارة' : 'Advisory Decision', icon: <Target className="w-4 h-4" /> },
             { id: 'CALCULATOR', label: isAr ? 'حاسبة التداول والعمولات' : 'Trading Calculator', icon: <Calculator className="w-4 h-4" /> },
             { id: 'CHARTS', label: isAr ? 'الشارت والمؤشرات' : 'Technicals & Charts', icon: <BarChart2 className="w-4 h-4" /> },
@@ -351,8 +369,8 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
               onClick={() => setActiveTab(tab.id as TabType)}
               className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
                 activeTab === tab.id
-                  ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                  : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/40'
               }`}
             >
               {tab.icon}
@@ -362,7 +380,21 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
         </div>
 
         {/* Content Body: 1 Column on Mobile, 2 Columns on Large Screens */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 bg-[#0a0d13]">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 lg:p-6 bg-slate-100/70 dark:bg-[#0a0d13]">
+
+          {/* ===================== TAB 0: LIVE INTRADAY DASHBOARD & CANDLESTICK ===================== */}
+          {activeTab === 'DASHBOARD' && (
+            <StockIntradayDashboard
+              stock={stock}
+              analysis={analysis}
+              fullData={fullData}
+              chartSeries={activeChartSeries}
+              lang={lang}
+              theme={theme}
+              onOpenCalculator={() => setActiveTab('CALCULATOR')}
+              onExportPdf={() => setIsPdfModalOpen(true)}
+            />
+          )}
 
           {/* ===================== TAB 1: EXECUTIVE DECISION & ADVISORY ===================== */}
           {activeTab === 'DECISION' && (
@@ -608,7 +640,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                         ${analysis.tradeSetup.target1}
                       </div>
                       <span className="text-[10px] text-emerald-400 block mt-1">
-                        +{(((analysis.tradeSetup.target1 - analysis.price) / analysis.price) * 100).toFixed(1)}% {isAr ? 'عائد متوقع' : 'gain'}
+                        +{((((analysis.tradeSetup?.target1 || analysis.price * 1.05) - analysis.price) / (analysis.price || 1)) * 100).toFixed(1)}% {isAr ? 'عائد متوقع' : 'gain'}
                       </span>
                     </div>
 
@@ -684,140 +716,81 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
 
           {/* ===================== TAB 2: TECHNICALS & CHARTS ===================== */}
           {activeTab === 'CHARTS' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6 items-start">
+            <div className="space-y-6">
               
-              {/* Column 1: Interactive Chart + Volume Sub-chart */}
-              <div className="space-y-4">
-                {/* Timeframes bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-[#11151e] p-2.5 rounded-xl border border-slate-800">
-                  <div className="flex items-center gap-1">
-                    {['1D', '5D', '1M', '3M', '6M', '1Y'].map((range) => (
-                      <button
-                        key={range}
-                        onClick={() => setSelectedRange(range)}
-                        className={`px-3 py-1.5 text-xs font-mono font-bold rounded-lg transition ${
-                          selectedRange === range
-                            ? 'bg-emerald-600 text-white shadow'
-                            : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
-                        }`}
-                      >
-                        {range}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="text-xs font-mono text-emerald-400">
-                    VWAP: ${analysis.technicals.vwap}
-                  </span>
-                </div>
-
-                {/* Main Interactive Chart */}
-                <div className="bg-[#11151e] p-4 rounded-2xl border border-slate-800 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
-                    <span className="font-bold text-slate-200">
-                      {isAr ? `الرسم البياني ومستويات التداول (${selectedRange})` : `Price Action & Levels (${selectedRange})`}
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2.5 font-mono text-[11px]">
-                      <span className="text-emerald-400">VWAP</span>
-                      <span className="text-rose-400">Stop: ${analysis.tradeSetup.stopLoss}</span>
-                      <span className="text-purple-400">T1: ${analysis.tradeSetup.target1}</span>
-                    </div>
-                  </div>
-
-                  <div className="h-72 sm:h-80 w-full">
-                    {activeChartSeries.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={activeChartSeries} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.35}/>
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                            </linearGradient>
-                          </defs>
-                          <XAxis dataKey="date" stroke="#475569" tick={{ fontSize: 10, fill: '#94a3b8' }} minTickGap={30} />
-                          <YAxis domain={['auto', 'auto']} stroke="#475569" tick={{ fontSize: 10, fill: '#94a3b8' }} orientation="right" />
-                          <Tooltip
-                            contentStyle={{ backgroundColor: '#090d14', borderColor: '#334155', borderRadius: '10px', fontSize: '12px' }}
-                          />
-                          <ReferenceLine y={analysis.technicals.vwap} stroke="#10b981" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: 'VWAP', fill: '#10b981', fontSize: 10 }} />
-                          <ReferenceLine y={analysis.tradeSetup.stopLoss} stroke="#f43f5e" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: 'Stop', fill: '#f43f5e', fontSize: 10 }} />
-                          <ReferenceLine y={analysis.tradeSetup.target1} stroke="#a855f7" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: 'T1', fill: '#a855f7', fontSize: 10 }} />
-                          <Area type="monotone" dataKey="close" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#priceGrad)" name="Close" />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-slate-500 text-xs">
-                        {isAr ? 'جاري تحميل الشارت...' : 'Loading Chart Data...'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Volume Sub-Chart */}
-                  {activeChartSeries.length > 0 && activeChartSeries[0]?.volume !== undefined && (
-                    <div className="pt-3 border-t border-slate-800/80">
-                      <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                        <span>{isAr ? 'تدفق السيولة والحجم' : 'Volume Flow'}</span>
-                        <span className="font-mono text-cyan-400">RVOL: {analysis.volumeDynamics.rvol}x</span>
-                      </div>
-                      <div className="h-20 sm:h-24 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={activeChartSeries} margin={{ top: 0, right: 5, left: 5, bottom: 0 }}>
-                            <XAxis dataKey="date" hide />
-                            <YAxis stroke="#475569" tick={{ fontSize: 9, fill: '#64748b' }} orientation="right" />
-                            <Tooltip contentStyle={{ backgroundColor: '#090d14', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                            <Bar dataKey="volume" fill="#0284c7" opacity={0.7} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              {/* Full-Featured TradingView / Nasdaq Real-Time Chart */}
+              <div className="w-full">
+                <TradingViewStyleChart
+                  data={activeChartSeries}
+                  symbol={stock.symbol}
+                  companyName={stock.companyName}
+                  currentPrice={analysis.price}
+                  change={analysis.change}
+                  changePercent={analysis.changePercent}
+                  dayOpen={stock.open}
+                  dayHigh={stock.dayHigh}
+                  dayLow={stock.dayLow}
+                  volume={analysis.volumeDynamics.currentVolume || stock.volume}
+                  lang={lang}
+                  theme={theme}
+                  selectedTimeframe={selectedRange}
+                  onTimeframeChange={(tf) => setSelectedRange(tf)}
+                  stopLossPrice={analysis.tradeSetup?.stopLoss}
+                  targetPrice={analysis.tradeSetup?.target1}
+                  vwapPrice={analysis.technicals?.vwap}
+                  isLive={true}
+                />
               </div>
 
-              {/* Column 2: Indicators Grid & Pivots */}
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block mb-1">EMA 9 / 20 / 50</span>
-                    <div className="text-xs font-mono font-bold text-slate-200 truncate">
-                      ${analysis.technicals.ema9} / ${analysis.technicals.ema20} / ${analysis.technicals.ema50}
+              {/* Technical Indicators Summary & Pivots */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+                
+                {/* Column 1: Technical Indicators Grid */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
+                      <span className="text-[10px] text-slate-400 block mb-1">EMA 9 / 20 / 50</span>
+                      <div className="text-xs font-mono font-bold text-slate-200 truncate">
+                        ${analysis.technicals.ema9} / ${analysis.technicals.ema20} / ${analysis.technicals.ema50}
+                      </div>
+                      <span className="text-[10px] text-emerald-400 block mt-1 truncate">
+                        {analysis.trend.emaAlignment ? (isAr ? 'ترتيب صاعد' : 'Bullish') : (isAr ? 'ترتيب مختلط' : 'Mixed')}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-emerald-400 block mt-1 truncate">
-                      {analysis.trend.emaAlignment ? (isAr ? 'ترتيب صاعد' : 'Bullish') : (isAr ? 'ترتيب مختلط' : 'Mixed')}
-                    </span>
-                  </div>
 
-                  <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block mb-1">RSI (14) & ATR (14)</span>
-                    <div className="text-xs font-mono font-bold text-slate-200">
-                      RSI: <strong className={analysis.technicals.rsi14 > 70 ? 'text-amber-400' : 'text-cyan-400'}>{analysis.technicals.rsi14}</strong> | ATR: ${analysis.technicals.atr14}
+                    <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
+                      <span className="text-[10px] text-slate-400 block mb-1">RSI (14) & ATR (14)</span>
+                      <div className="text-xs font-mono font-bold text-slate-200">
+                        RSI: <strong className={analysis.technicals.rsi14 > 70 ? 'text-amber-400' : 'text-cyan-400'}>{analysis.technicals.rsi14}</strong> | ATR: ${analysis.technicals.atr14}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-1 truncate">
+                        ADX Trend: {analysis.technicals.adx14.adx}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 block mt-1 truncate">
-                      ADX Trend: {analysis.technicals.adx14.adx}
-                    </span>
-                  </div>
 
-                  <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block mb-1">MACD (12, 26, 9)</span>
-                    <div className="text-xs font-mono font-bold text-slate-200">
-                      Hist: <span className={analysis.technicals.macd.histogram >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{analysis.technicals.macd.histogram}</span>
+                    <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
+                      <span className="text-[10px] text-slate-400 block mb-1">MACD (12, 26, 9)</span>
+                      <div className="text-xs font-mono font-bold text-slate-200">
+                        Hist: <span className={analysis.technicals.macd.histogram >= 0 ? 'text-emerald-400' : 'text-rose-400'}>{analysis.technicals.macd.histogram}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-1 truncate">
+                        {analysis.technicals.macd.state}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 block mt-1 truncate">
-                      {analysis.technicals.macd.state}
-                    </span>
-                  </div>
 
-                  <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
-                    <span className="text-[10px] text-slate-400 block mb-1">Bollinger Bands (20, 2)</span>
-                    <div className="text-xs font-mono font-bold text-slate-200 truncate">
-                      U: ${analysis.technicals.bollingerBands.upper} | L: ${analysis.technicals.bollingerBands.lower}
+                    <div className="p-3.5 bg-[#11151e] border border-slate-800 rounded-xl">
+                      <span className="text-[10px] text-slate-400 block mb-1">Bollinger Bands (20, 2)</span>
+                      <div className="text-xs font-mono font-bold text-slate-200 truncate">
+                        U: ${analysis.technicals.bollingerBands.upper} | L: ${analysis.technicals.bollingerBands.lower}
+                      </div>
+                      <span className="text-[10px] text-cyan-400 block mt-1 truncate">
+                        BW: {analysis.technicals.bollingerBands.bandwidth}%
+                      </span>
                     </div>
-                    <span className="text-[10px] text-cyan-400 block mt-1 truncate">
-                      BW: {analysis.technicals.bollingerBands.bandwidth}%
-                    </span>
                   </div>
                 </div>
 
-                {/* Support & Resistance Table */}
+                {/* Column 2: Support & Resistance Table */}
                 <div className="p-4 bg-[#11151e] border border-slate-800 rounded-2xl space-y-3">
                   <span className="text-xs font-bold text-slate-200 block">
                     {isAr ? 'مستويات الدعم والمقاومة اللحظية' : 'Key Support & Resistance Levels'}
@@ -833,6 +806,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                     </div>
                   </div>
                 </div>
+
               </div>
 
             </div>
@@ -1254,8 +1228,8 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                       <span>{isAr ? 'التنبيه العلوي (مقاومة / هدف $)' : 'Upper Alert Threshold ($)'}</span>
                       <button
                         type="button"
-                        onClick={() => setUpperVal(analysis.tradeSetup.target1.toString())}
-                        className="text-[10px] text-emerald-400 hover:underline"
+                        onClick={() => setUpperVal(String(analysis.tradeSetup?.target1 ?? ''))}
+                        className="text-[10px] text-emerald-400 hover:underline cursor-pointer"
                       >
                         {isAr ? 'تطبيق Target 1' : 'Apply Target 1'}
                       </button>
@@ -1265,7 +1239,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                       step="0.01"
                       value={upperVal}
                       onChange={(e) => setUpperVal(e.target.value)}
-                      placeholder={analysis.tradeSetup.target1.toString()}
+                      placeholder={String(analysis.tradeSetup?.target1 ?? (analysis.price * 1.05).toFixed(2))}
                       className="w-full px-3.5 py-2.5 bg-black/50 border border-slate-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1276,8 +1250,8 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                       <span>{isAr ? 'التنبيه السفلي (دعم / وقف خسارة $)' : 'Lower Alert Threshold ($)'}</span>
                       <button
                         type="button"
-                        onClick={() => setLowerVal(analysis.tradeSetup.stopLoss.toString())}
-                        className="text-[10px] text-rose-400 hover:underline"
+                        onClick={() => setLowerVal(String(analysis.tradeSetup?.stopLoss ?? ''))}
+                        className="text-[10px] text-rose-400 hover:underline cursor-pointer"
                       >
                         {isAr ? 'تطبيق Stop Loss' : 'Apply Stop Loss'}
                       </button>
@@ -1287,7 +1261,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                       step="0.01"
                       value={lowerVal}
                       onChange={(e) => setLowerVal(e.target.value)}
-                      placeholder={analysis.tradeSetup.stopLoss.toString()}
+                      placeholder={String(analysis.tradeSetup?.stopLoss ?? (analysis.price * 0.95).toFixed(2))}
                       className="w-full px-3.5 py-2.5 bg-black/50 border border-slate-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:border-rose-500"
                     />
                   </div>
@@ -1346,6 +1320,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                   initialBuyPrice={analysis.tradeSetup?.preferredEntryMax || analysis.price}
                   initialShares={50}
                   initialCurrentPrice={analysis.price}
+                  onOpenScientificAnalysis={() => setActiveTab('DASHBOARD')}
                   onSaveToWatchlist={(data) => {
                     apiService.saveWatchlistItem({
                       symbol: data.symbol,
@@ -1370,6 +1345,19 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
         </div>
 
       </div>
+
+      {/* PDF Export Modal Dossier */}
+      {isPdfModalOpen && analysis && (
+        <StockAnalysisPdfModal
+          isOpen={isPdfModalOpen}
+          onClose={() => setIsPdfModalOpen(false)}
+          stock={stock}
+          analysis={analysis}
+          fullData={fullData}
+          lang={lang}
+        />
+      )}
+
     </div>
   );
 };

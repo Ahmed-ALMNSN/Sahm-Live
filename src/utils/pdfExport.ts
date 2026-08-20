@@ -8,8 +8,8 @@ export interface GeneratePdfOptions {
 }
 
 /**
- * Captures an HTML element and exports it as a high-resolution PDF document.
- * Supports multi-page splitting for long analytical reports.
+ * Captures an HTML element and exports it as an Institutional A4 PDF document.
+ * Maintains pristine aspect ratio, typography, and page splits.
  */
 export async function exportElementToPdf(
   elementOrId: HTMLElement | string,
@@ -29,13 +29,22 @@ export async function exportElementToPdf(
     const originalScroll = targetElement.scrollTop;
     targetElement.scrollTop = 0;
 
-    // Capture using html2canvas with high scale for crisp text
+    // Capture using html2canvas with high scale for crisp institutional typography
     const canvas = await html2canvas(targetElement, {
       scale: 2,
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
-      windowWidth: targetElement.scrollWidth || 1200,
+      windowWidth: targetElement.scrollWidth || 800,
+      ignoreElements: (element) => {
+        // Ignore loading overlays, spinners, toolbars, and no-print elements
+        return (
+          element.classList?.contains('no-print') ||
+          element.classList?.contains('loading-overlay') ||
+          element.getAttribute('aria-busy') === 'true' ||
+          element.id === 'report-loading-overlay'
+        );
+      },
     });
 
     targetElement.scrollTop = originalScroll;
@@ -50,25 +59,27 @@ export async function exportElementToPdf(
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
 
-    const imgWidth = pdfWidth - 20; // 10mm margins on each side
+    const marginX = 8; // 8mm margin
+    const marginY = 8;
+    const imgWidth = pdfWidth - (marginX * 2);
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
     let heightLeft = imgHeight;
-    let position = 10; // 10mm top margin
+    let position = marginY;
 
     // First page
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, Math.min(imgHeight, pdfHeight - 20));
-    heightLeft -= (pdfHeight - 20);
+    pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, Math.min(imgHeight, pdfHeight - (marginY * 2)));
+    heightLeft -= (pdfHeight - (marginY * 2));
 
-    // Subsequent pages if long report
+    // Subsequent pages if multi-page report
     while (heightLeft > 0) {
-      position = heightLeft - imgHeight + 10;
+      position = heightLeft - imgHeight + marginY;
       pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= (pdfHeight - 20);
+      pdf.addImage(imgData, 'PNG', marginX, position, imgWidth, imgHeight);
+      heightLeft -= (pdfHeight - (marginY * 2));
     }
 
-    const defaultFileName = options.fileName || `Sahm_Analysis_${new Date().toISOString().split('T')[0]}.pdf`;
+    const defaultFileName = options.fileName || `Sahm_Institutional_Report_${new Date().toISOString().split('T')[0]}.pdf`;
     pdf.save(defaultFileName.endsWith('.pdf') ? defaultFileName : `${defaultFileName}.pdf`);
     return true;
   } catch (error) {

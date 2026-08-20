@@ -32,7 +32,11 @@ import {
   Sliders,
   Calendar,
   Layers,
-  ChevronRight
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  Crosshair,
+  Scan
 } from 'lucide-react';
 import { ChartDataPoint, Language, Theme } from '../types.js';
 import {
@@ -512,6 +516,17 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
             labelBackgroundColor: crosshairLabelBg,
           },
         },
+        handleScroll: {
+          mouseWheel: true,
+          pressedMouseMove: true,
+          horzTouchDrag: true,
+          vertTouchDrag: true,
+        },
+        handleScale: {
+          axisPressedMouseMove: true,
+          mouseWheel: true,
+          pinch: true,
+        },
         rightPriceScale: {
           borderColor: chartBorder,
           scaleMargins: {
@@ -527,7 +542,7 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
           secondsVisible: false,
           rightOffset: isIntraday ? Math.min(60, futureBarsRemaining + 5) : 10,
           barSpacing: isIntraday ? 10 : 8,
-          minBarSpacing: 4,
+          minBarSpacing: 3,
         },
       });
       chartApiRef.current = chart;
@@ -621,7 +636,7 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
         });
       }
 
-      // 4. Crosshair Move Handler for HUD
+      // 4. Crosshair Move Handler for HUD & Tooltip
       chart.subscribeCrosshairMove((param) => {
         if (!param.time || !param.seriesData || !param.seriesData.get(mainSeries)) {
           setHoveredCandle(null);
@@ -629,6 +644,8 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
         }
 
         const bar: any = param.seriesData.get(mainSeries);
+        const volBar: any = volumeSeriesRef.current ? param.seriesData.get(volumeSeriesRef.current) : null;
+
         if (bar) {
           const timeStr =
             typeof param.time === 'number'
@@ -645,6 +662,7 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
           const close = Number(bar.close ?? bar.value ?? 0);
           const diff = close - open;
           const diffPct = open > 0 ? (diff / open) * 100 : 0;
+          const volVal = volBar ? Number(volBar.value ?? 0) : undefined;
 
           setHoveredCandle({
             time: `${timeStr} ET`,
@@ -652,6 +670,7 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
             high,
             low,
             close,
+            volume: volVal,
             change: diff,
             changePercent: diffPct,
           });
@@ -988,6 +1007,37 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
     } catch (e) {}
   }, []);
 
+  // Zoom In helper
+  const handleZoomIn = useCallback(() => {
+    try {
+      if (chartApiRef.current) {
+        const timeScale = chartApiRef.current.timeScale();
+        const currentSpacing = (timeScale as any).options?.()?.barSpacing || 10;
+        timeScale.applyOptions({ barSpacing: Math.min(50, currentSpacing * 1.3) });
+      }
+    } catch (e) {}
+  }, []);
+
+  // Zoom Out helper
+  const handleZoomOut = useCallback(() => {
+    try {
+      if (chartApiRef.current) {
+        const timeScale = chartApiRef.current.timeScale();
+        const currentSpacing = (timeScale as any).options?.()?.barSpacing || 10;
+        timeScale.applyOptions({ barSpacing: Math.max(2, currentSpacing * 0.75) });
+      }
+    } catch (e) {}
+  }, []);
+
+  // Scroll to Realtime / Latest Candle
+  const handleScrollToLatest = useCallback(() => {
+    try {
+      if (chartApiRef.current) {
+        chartApiRef.current.timeScale().scrollToRealTime();
+      }
+    } catch (e) {}
+  }, []);
+
   // Playback / Live Replay Loop
   useEffect(() => {
     if (!isPlaying) {
@@ -1189,11 +1239,19 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
           <div className="flex flex-wrap items-center gap-3 text-slate-700 dark:text-slate-300">
             {hoveredCandle ? (
               <>
-                <span className="text-cyan-600 dark:text-cyan-400 font-bold">{hoveredCandle.time}</span>
+                <span className="text-cyan-600 dark:text-cyan-400 font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">{hoveredCandle.time}</span>
                 <span>O: <strong className="text-slate-900 dark:text-white">${hoveredCandle.open.toFixed(2)}</strong></span>
-                <span>H: <strong className="text-slate-900 dark:text-white">${hoveredCandle.high.toFixed(2)}</strong></span>
-                <span>L: <strong className="text-slate-900 dark:text-white">${hoveredCandle.low.toFixed(2)}</strong></span>
+                <span>H: <strong className="text-emerald-600 dark:text-emerald-400">${hoveredCandle.high.toFixed(2)}</strong></span>
+                <span>L: <strong className="text-rose-600 dark:text-rose-400">${hoveredCandle.low.toFixed(2)}</strong></span>
                 <span>C: <strong className="text-slate-900 dark:text-white">${hoveredCandle.close.toFixed(2)}</strong></span>
+                {hoveredCandle.change !== undefined && (
+                  <span className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${hoveredCandle.change >= 0 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' : 'text-rose-600 dark:text-rose-400 bg-rose-500/10'}`}>
+                    {hoveredCandle.change >= 0 ? '+' : ''}{hoveredCandle.change.toFixed(2)} ({hoveredCandle.changePercent ? (hoveredCandle.changePercent >= 0 ? '+' : '') + hoveredCandle.changePercent.toFixed(2) + '%' : '0%'})
+                  </span>
+                )}
+                {hoveredCandle.volume !== undefined && hoveredCandle.volume > 0 && (
+                  <span>Vol: <strong className="text-cyan-600 dark:text-cyan-400">{hoveredCandle.volume.toLocaleString()}</strong></span>
+                )}
               </>
             ) : (
               <>
@@ -1259,7 +1317,7 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
       </div>
 
       {/* ===================== MAIN CHART CANVAS ===================== */}
-      <div className="relative flex-1 w-full min-h-[400px] bg-white dark:bg-[#090D14]">
+      <div className="relative flex-1 w-full min-h-[400px] bg-white dark:bg-[#090D14] group">
         <div ref={chartContainerRef} className="w-full h-full min-h-[400px]" />
 
         {/* Live Candle Formation Floating Indicator */}
@@ -1275,6 +1333,46 @@ export const TradingViewStyleChart: React.FC<TradingViewStyleChartProps> = ({
             </span>
           </div>
         )}
+
+        {/* Floating Zoom & Navigation Controls Overlay */}
+        <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 p-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-sm">
+          <button
+            type="button"
+            id="chart-zoom-in-btn"
+            title={isAr ? 'تكبير (Zoom In)' : 'Zoom In (+)'}
+            onClick={handleZoomIn}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            id="chart-zoom-out-btn"
+            title={isAr ? 'تصغير (Zoom Out)' : 'Zoom Out (-)'}
+            onClick={handleZoomOut}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            id="chart-fit-view-btn"
+            title={isAr ? 'ملاءمة النطاق الكامل' : 'Fit Entire Range'}
+            onClick={handleFitContent}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer text-xs font-mono font-bold"
+          >
+            <Scan className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            id="chart-scroll-latest-btn"
+            title={isAr ? 'الانتقال لآخر شمعة' : 'Scroll to Latest Candle'}
+            onClick={handleScrollToLatest}
+            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition cursor-pointer text-xs font-mono font-bold"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* ===================== SUB-CHART (RSI / MACD / MFI) ===================== */}

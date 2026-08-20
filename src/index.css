@@ -96,15 +96,26 @@
   animation: flash-red 1.2s ease-out;
 }
 
-/* Print Optimization Styles */
+/* Print Optimization Styles - Institutional Grade Full Width & High Legibility */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 12mm 12mm;
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #0f172a !important;
-    font-size: 12pt !important;
+    font-size: 10.5pt !important;
+    line-height: 1.4 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
-  nav, footer, .no-print, #btn-print, button {
+  nav, footer, .no-print, #btn-print, #btn-export-pdf, button, .toolbar, .no-print-area {
     display: none !important;
   }
 
@@ -112,36 +123,83 @@
     display: block !important;
   }
 
-  .print-container {
+  .print-container, #institutional-report-content {
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
     max-width: 100% !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     color: #0f172a !important;
+    overflow: visible !important;
   }
 
+  /* Force Tables to Retain Structure, Borders, and Full Width Without Truncation */
   table {
     width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
     border-collapse: collapse !important;
-    page-break-inside: auto;
+    table-layout: auto !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    font-size: 9.5pt !important;
+    margin-bottom: 8px !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
   }
 
   tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: auto !important;
   }
 
   th, td {
     border: 1px solid #cbd5e1 !important;
     color: #0f172a !important;
-    padding: 6px 10px !important;
+    padding: 5px 8px !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
   }
 
   th {
     background-color: #f1f5f9 !important;
-    font-weight: bold !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Absolute page breaks before major report sections */
+  .page-break-before,
+  #section-technical-analysis,
+  #section-trading-plan,
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  /* Ensure Cards and Grid Sections Break Gracefully */
+  section, .report-card, .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* Ensure SVGs and embedded charts render at high resolution */
+  svg {
+    max-width: 100% !important;
+    height: auto !important;
   }
 }
 

@@ -65,7 +65,10 @@ import {
 import { ErrorBoundary } from './ErrorBoundary.js';
 import { TradingCalculator } from './TradingCalculator.js';
 import { StockIntradayDashboard } from './StockIntradayDashboard.js';
-import { StockAnalysisPdfModal } from './StockAnalysisPdfModal.js';
+import { ProfessionalPdfReportTemplate } from './ProfessionalPdfReportTemplate.js';
+import { ReportLoadingOverlay } from './ReportLoadingOverlay.js';
+import { ProfessionalReportData } from '../utils/reportEngine.js';
+import { executeReportGenerationFlow, ReportGenerationProgress } from '../utils/professionalPdfService.js';
 
 interface StockScientificAnalysisModalProps {
   stock: StockItem | null;
@@ -74,6 +77,7 @@ interface StockScientificAnalysisModalProps {
   lang: Language;
   theme?: Theme;
   onUpdateAlerts: (symbol: string, upperAlert: number | null, lowerAlert: number | null, alertsEnabled: boolean) => void;
+  onOpenReportPage?: (report: ProfessionalReportData, stock: StockItem) => void;
 }
 
 type TabType = 'DASHBOARD' | 'DECISION' | 'CALCULATOR' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS';
@@ -85,6 +89,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
   lang,
   theme,
   onUpdateAlerts,
+  onOpenReportPage,
 }) => {
   const t = getTranslation(lang);
 
@@ -95,7 +100,31 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
   const [userWeights, setUserWeights] = useState<QuantitativeConfig['weights']>(DEFAULT_CONFIG.weights);
   const [showCustomWeights, setShowCustomWeights] = useState<boolean>(false);
   const [isMaximized, setIsMaximized] = useState<boolean>(true);
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
+  const [calculatorShares, setCalculatorShares] = useState<number>(1000);
+  const [reportProgress, setReportProgress] = useState<ReportGenerationProgress>({
+    isGenerating: false,
+    stageIndex: 1,
+    totalStages: 10,
+    stepText: '',
+    isComplete: false,
+    report: null,
+  });
+
+  const handleExportProfessionalReport = async () => {
+    if (!stock) return;
+    const generatedReport = await executeReportGenerationFlow(
+      stock,
+      fullData,
+      lang,
+      calculatorShares,
+      setReportProgress
+    );
+
+    if (generatedReport && onOpenReportPage) {
+      onClose();
+      onOpenReportPage(generatedReport, stock);
+    }
+  };
 
   // Alert Inputs
   const [upperVal, setUpperVal] = useState<string>('');
@@ -312,12 +341,13 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
             <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800 rtl:border-l-0 rtl:border-r rtl:pr-2">
               <button
                 type="button"
-                onClick={() => setIsPdfModalOpen(true)}
-                title={isAr ? 'تصدير تقرير التحليل والداشبورد إلى PDF' : 'Export Analysis Dossier to PDF'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-900/30 transition cursor-pointer"
+                onClick={handleExportProfessionalReport}
+                disabled={reportProgress.isGenerating}
+                title={isAr ? 'تصدير التقرير المؤسسي الشامل للسهم' : 'Export Institutional Stock Report'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-900/30 transition cursor-pointer disabled:opacity-50"
               >
-                <FileDown className="w-4 h-4" />
-                <span className="hidden sm:inline">{isAr ? 'تصدير PDF' : 'Export PDF'}</span>
+                <FileDown className={`w-4 h-4 ${reportProgress.isGenerating ? 'animate-bounce' : ''}`} />
+                <span className="hidden sm:inline">{isAr ? 'تصدير التقرير' : 'Export Report'}</span>
               </button>
               <button
                 onClick={() => setIsMaximized(!isMaximized)}
@@ -356,7 +386,6 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
             { id: 'DASHBOARD', label: isAr ? 'الداشبورد المباشر والشارت' : 'Live Dashboard & Charts', icon: <Radio className="w-4 h-4 text-emerald-500" /> },
             { id: 'DECISION', label: isAr ? 'القرار والاستشارة' : 'Advisory Decision', icon: <Target className="w-4 h-4" /> },
             { id: 'CALCULATOR', label: isAr ? 'حاسبة التداول والعمولات' : 'Trading Calculator', icon: <Calculator className="w-4 h-4" /> },
-            { id: 'CHARTS', label: isAr ? 'الشارت والمؤشرات' : 'Technicals & Charts', icon: <BarChart2 className="w-4 h-4" /> },
             { id: 'VOLUME', label: isAr ? 'الحجم والسرعة RVOL' : 'Volume & RVOL', icon: <Activity className="w-4 h-4" /> },
             { id: 'FUNDAMENTALS', label: isAr ? 'التحليل المالي والجودة' : 'Financial Quality', icon: <Building2 className="w-4 h-4" /> },
             { id: 'DILUTION', label: isAr ? 'مخاطر التخفيف والتقسيم' : 'Dilution & Splits', icon: <ShieldAlert className="w-4 h-4" /> },
@@ -392,7 +421,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
               lang={lang}
               theme={theme}
               onOpenCalculator={() => setActiveTab('CALCULATOR')}
-              onExportPdf={() => setIsPdfModalOpen(true)}
+              onExportPdf={handleExportProfessionalReport}
             />
           )}
 
@@ -1318,8 +1347,9 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                 <TradingCalculator
                   initialSymbol={analysis.symbol}
                   initialBuyPrice={analysis.tradeSetup?.preferredEntryMax || analysis.price}
-                  initialShares={50}
+                  initialShares={calculatorShares || 50}
                   initialCurrentPrice={analysis.price}
+                  onSharesChange={(s) => setCalculatorShares(s)}
                   onOpenScientificAnalysis={() => setActiveTab('DASHBOARD')}
                   onSaveToWatchlist={(data) => {
                     apiService.saveWatchlistItem({
@@ -1346,17 +1376,15 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
 
       </div>
 
-      {/* PDF Export Modal Dossier */}
-      {isPdfModalOpen && analysis && (
-        <StockAnalysisPdfModal
-          isOpen={isPdfModalOpen}
-          onClose={() => setIsPdfModalOpen(false)}
-          stock={stock}
-          analysis={analysis}
-          fullData={fullData}
-          lang={lang}
-        />
-      )}
+      {/* Professional Report Generation Loading Overlay */}
+      <ReportLoadingOverlay
+        isOpen={reportProgress.isGenerating}
+        stepText={reportProgress.stepText}
+        stageIndex={reportProgress.stageIndex}
+        totalStages={reportProgress.totalStages}
+        isComplete={reportProgress.isComplete}
+        lang={lang}
+      />
 
     </div>
   );

@@ -494,11 +494,11 @@ export const StockIntradayDashboard: React.FC<StockIntradayDashboardProps> = ({
                 <button
                   type="button"
                   onClick={onExportPdf}
-                  title={isAr ? 'تصدير الداشبورد والتحليل إلى ملف PDF' : 'Export Dashboard & Analysis to PDF'}
+                  title={isAr ? 'تصدير التقرير المؤسسي الشامل للسهم' : 'Export Institutional Stock Report'}
                   className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-700 shadow-md transition active:scale-95 cursor-pointer"
                 >
                   <FileDown className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-                  <span>{isAr ? 'تصدير PDF' : 'Export PDF'}</span>
+                  <span>{isAr ? 'تصدير التقرير' : 'Export Report'}</span>
                 </button>
               )}
 

@@ -44,6 +44,7 @@ interface TradingCalculatorProps {
   onSaveToWatchlist?: (data: { symbol: string; buyPrice: number; shares: number; brokerId: string }) => void;
   onSaveToPortfolio?: (data: { symbol: string; buyPrice: number; shares: number; brokerId: string }) => void;
   onOpenScientificAnalysis?: (symbol: string) => void;
+  onSharesChange?: (shares: number) => void;
 }
 
 const POPULAR_SYMBOLS = ['NVDA', 'AAPL', 'TSLA', 'MSFT', 'AMZN', 'PLTR', 'META', 'GOOGL'];
@@ -57,6 +58,7 @@ export const TradingCalculator: React.FC<TradingCalculatorProps> = ({
   onSaveToWatchlist,
   onSaveToPortfolio,
   onOpenScientificAnalysis,
+  onSharesChange,
 }) => {
   const [brokers, setBrokers] = useState<BrokeragePlatform[]>([]);
   const [selectedBrokerId, setSelectedBrokerId] = useState<string>('broker_sahm');
@@ -73,7 +75,15 @@ export const TradingCalculator: React.FC<TradingCalculatorProps> = ({
 
   // Trade Inputs
   const [buyPrice, setBuyPrice] = useState<number>(initialBuyPrice && initialBuyPrice > 0 ? initialBuyPrice : 140);
-  const [shares, setShares] = useState<number>(initialShares > 0 ? initialShares : 50);
+  const [shares, setSharesState] = useState<number>(initialShares > 0 ? initialShares : 50);
+
+  const setShares = (val: number | ((prev: number) => number)) => {
+    setSharesState((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      if (onSharesChange && next > 0) onSharesChange(next);
+      return next;
+    });
+  };
   const [sellPrice, setSellPrice] = useState<number>(
     initialCurrentPrice && initialCurrentPrice > 0
       ? initialCurrentPrice

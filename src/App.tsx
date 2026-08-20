@@ -20,6 +20,8 @@ import { StockReportModal } from './components/StockReportModal.js';
 import { CalculatorModal } from './components/CalculatorModal.js';
 import { PortfolioModal } from './components/PortfolioModal.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { StockReportPage } from './pages/StockReportPage.js';
+import { ProfessionalReportData, generateProfessionalReport } from './utils/reportEngine.js';
 import { alertEngine } from './utils/alertEngine.js';
 import { apiService } from './services/api.js';
 import { calculateStockMfi } from './utils/moneyFlow.js';
@@ -219,7 +221,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
 
-  // 8. Modals state
+  // 8. Modals & Report Page state
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isHistoryDrawerOpen, setIsHistoryDrawerOpen] = useState(false);
@@ -228,6 +230,8 @@ export default function App() {
   const [calculatorStockSymbol, setCalculatorStockSymbol] = useState<string | null>(null);
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string | null>(null);
+  const [activeReport, setActiveReport] = useState<{ data: ProfessionalReportData; stock: StockItem } | null>(null);
+  const [isRefreshingReport, setIsRefreshingReport] = useState(false);
 
   // Ref lock to prevent overlapping quote batches
   const isFetchingRef = useRef(false);
@@ -325,6 +329,111 @@ export default function App() {
 
     initializeDatabaseData();
   }, []);
+
+  // Listen to URL routing for /stock/:symbol/report and /stock/:symbol
+  useEffect(() => {
+    let isCancelled = false;
+
+    const handleUrlRoute = async () => {
+      const path = window.location.pathname;
+      const reportMatch = path.match(/^\/stock\/([^/]+)\/report/i) || path.match(/^\/report\/([^/]+)/i);
+      
+      if (reportMatch && reportMatch[1]) {
+        const sym = decodeURIComponent(reportMatch[1]).trim().toUpperCase();
+        let found = stocksRef.current.find(s => s.symbol.toUpperCase() === sym) || DEFAULT_STOCKS.find(s => s.symbol.toUpperCase() === sym);
+
+        if (!found) {
+          // Construct immediate valid stock profile so screen renders instantly
+          const fallbackStock: StockItem = {
+            symbol: sym,
+            companyName: `${sym} Corporation`,
+            sector: 'General Market',
+            exchange: 'US Market',
+            price: 50.00,
+            change: 0.00,
+            changePercent: 0.00,
+            open: 50.00,
+            previousClose: 50.00,
+            dayHigh: 51.50,
+            dayLow: 49.20,
+            volume: 1500000,
+            upperAlert: null,
+            lowerAlert: null,
+            alertsEnabled: true,
+            lastUpdated: Date.now(),
+          };
+
+          const initialReport = generateProfessionalReport(fallbackStock, null, 1000);
+          if (!isCancelled) {
+            setActiveReport({ data: initialReport, stock: fallbackStock });
+          }
+
+          // Asynchronously enrich with live quote & analysis data from API
+          try {
+            const [quotesMap, analysisData] = await Promise.allSettled([
+              apiService.fetchBatchQuotes([sym]),
+              apiService.fetchFullAnalysis(sym),
+            ]);
+
+            const quote = quotesMap.status === 'fulfilled' ? quotesMap.value[sym] : null;
+            const fullAnalysis = analysisData.status === 'fulfilled' ? analysisData.value : null;
+
+            const enrichedStock: StockItem = {
+              symbol: sym,
+              companyName: fullAnalysis?.companyName || quote?.companyName || `${sym} Corporation`,
+              sector: fullAnalysis?.sector || quote?.sector || 'General Market',
+              industry: fullAnalysis?.industry || 'Equities',
+              exchange: fullAnalysis?.exchange || quote?.exchange || 'US Market',
+              price: quote?.price || fullAnalysis?.quote?.price || fallbackStock.price,
+              change: quote?.change || fullAnalysis?.quote?.change || 0,
+              changePercent: quote?.changePercent || fullAnalysis?.quote?.changePercent || 0,
+              open: quote?.open || fullAnalysis?.quote?.open || quote?.price || fallbackStock.open,
+              previousClose: quote?.previousClose || fullAnalysis?.quote?.previousClose || fallbackStock.previousClose,
+              dayHigh: quote?.high || fullAnalysis?.quote?.high || fallbackStock.dayHigh,
+              dayLow: quote?.low || fullAnalysis?.quote?.low || fallbackStock.dayLow,
+              volume: quote?.volume || fullAnalysis?.quote?.volume || fallbackStock.volume,
+              upperAlert: null,
+              lowerAlert: null,
+              alertsEnabled: true,
+              lastUpdated: Date.now(),
+            };
+
+            if (!isCancelled) {
+              const liveReport = generateProfessionalReport(enrichedStock, fullAnalysis, 1000);
+              setActiveReport({ data: liveReport, stock: enrichedStock });
+            }
+          } catch (e) {
+            console.warn('Could not fetch external quotes for report:', e);
+          }
+          return;
+        }
+
+        const report = generateProfessionalReport(found, null, 1000);
+        if (!isCancelled) {
+          setActiveReport({ data: report, stock: found });
+        }
+        return;
+      }
+
+      const stockMatch = path.match(/^\/stock\/([^/]+)$/i);
+      if (stockMatch && stockMatch[1]) {
+        const sym = decodeURIComponent(stockMatch[1]).trim().toUpperCase();
+        setSelectedStockSymbol(sym);
+      }
+
+      if (!path.includes('/report')) {
+        setActiveReport(null);
+      }
+    };
+
+    window.addEventListener('popstate', handleUrlRoute);
+    handleUrlRoute();
+
+    return () => {
+      isCancelled = true;
+      window.removeEventListener('popstate', handleUrlRoute);
+    };
+  }, [isDbLoaded]);
 
   // Request browser notification permission
   const handleRequestNotifications = async () => {
@@ -808,6 +917,37 @@ export default function App() {
     } as StockItem;
   }, [stocks, selectedStockSymbol]);
 
+  // If Stock Report Page is active, render full Institutional Report view
+  if (activeReport) {
+    return (
+      <ErrorBoundary fallbackTitle="تعذر عرض تقرير السهم">
+        <StockReportPage
+          report={activeReport.data}
+          lang={lang}
+          theme={theme}
+          onToggleLanguage={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
+          onToggleTheme={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+          onBack={() => {
+            const sym = activeReport.stock.symbol;
+            setActiveReport(null);
+            setSelectedStockSymbol(sym);
+            window.history.pushState(null, '', '/');
+          }}
+          onRefresh={async () => {
+            setIsRefreshingReport(true);
+            try {
+              const updatedReport = generateProfessionalReport(activeReport.stock, null, 1000);
+              setActiveReport({ data: updatedReport, stock: activeReport.stock });
+            } finally {
+              setIsRefreshingReport(false);
+            }
+          }}
+          isRefreshing={isRefreshingReport}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#0a0b0d] text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       
@@ -915,6 +1055,10 @@ export default function App() {
           lang={lang}
           theme={theme}
           onUpdateAlerts={handleUpdateAlerts}
+          onOpenReportPage={(report, stock) => {
+            setActiveReport({ data: report, stock });
+            window.history.pushState(null, '', `/stock/${stock.symbol}/report`);
+          }}
         />
       </ErrorBoundary>
 

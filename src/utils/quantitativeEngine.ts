@@ -1412,3 +1412,6 @@ export function runScientificAnalysis(
     summaryArabic,
   };
 }
+
+export const runQuantitativeEngine = runScientificAnalysis;
+

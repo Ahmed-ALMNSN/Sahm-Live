@@ -63,6 +63,7 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
   const [newBuyPrice, setNewBuyPrice] = useState(150);
   const [newBrokerId, setNewBrokerId] = useState('broker_sahm');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const isAr = lang === 'ar';
 
@@ -173,10 +174,17 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
   };
 
   const handleDeletePosition = async (id: string) => {
-    if (window.confirm(isAr ? 'هل أنت متأكد من حذف هذا المركز من المحفظة؟' : 'Are you sure you want to delete this position?')) {
+    setDeletingId(id);
+    try {
       await apiService.deletePortfolioPosition(id);
+      // Optimistically update local positions list
+      setPositions((prev) => prev.filter((item) => item.id !== id));
       await loadData();
       if (onPositionUpdated) onPositionUpdated();
+    } catch (err: any) {
+      setErrorMsg(err?.message || (isAr ? 'تعذر حذف المركز من المحفظة' : 'Failed to delete position'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -669,11 +677,17 @@ export const PortfolioModal: React.FC<PortfolioModalProps> = ({
                         <td className="py-3 px-4 text-center">
                           <button
                             type="button"
+                            id={`btn-delete-position-${p.id}`}
+                            disabled={deletingId === p.id}
                             onClick={() => handleDeletePosition(p.id)}
-                            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors"
-                            title={isAr ? 'حذف المركز' : 'Delete'}
+                            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 dark:hover:bg-rose-500/20 border border-transparent hover:border-rose-500/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                            title={isAr ? 'حذف المركز' : 'Delete position'}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {deletingId === p.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
                           </button>
                         </td>
                       </tr>

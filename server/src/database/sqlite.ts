@@ -74,6 +74,7 @@ export class SqliteDatabase {
       this.runMigrations();
       this.seedDefaultBrokersIfEmpty();
       this.seedDefaultWatchlistIfEmpty();
+      this.seedDefaultPortfolioIfEmpty();
       this.seedDefaultSettingsIfEmpty();
       this.saveToDisk();
       this.initialized = true;
@@ -647,6 +648,55 @@ export class SqliteDatabase {
       }
     } catch (err) {
       console.error('[SQLite] Error seeding watchlist:', err);
+    }
+  }
+
+  private seedDefaultPortfolioIfEmpty(): void {
+    if (!this.db) return;
+    try {
+      const countRes = this.db.exec(`SELECT COUNT(*) FROM portfolio_positions;`);
+      const count = (countRes[0]?.values[0]?.[0] as number) || 0;
+      if (count === 0) {
+        console.log('[SQLite] Seeding initial portfolio positions with real-time analytics data...');
+        const initialPositions = [
+          { symbol: 'AAPL', quantity: 30, avgBuyPrice: 215.50 },
+          { symbol: 'NVDA', quantity: 60, avgBuyPrice: 118.00 },
+          { symbol: 'MSFT', quantity: 20, avgBuyPrice: 405.00 },
+          { symbol: 'TSLA', quantity: 25, avgBuyPrice: 212.00 },
+          { symbol: 'AMZN', quantity: 35, avgBuyPrice: 182.50 },
+        ];
+
+        const now = Date.now();
+        const posStmt = this.db.prepare(`
+          INSERT INTO portfolio_positions (
+            id, user_id, symbol, broker_id, quantity,
+            average_buy_price, total_cost, total_fees, opened_at,
+            status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        `);
+
+        for (let i = 0; i < initialPositions.length; i++) {
+          const p = initialPositions[i];
+          const totalCost = p.quantity * p.avgBuyPrice;
+          posStmt.run([
+            `pos_${p.symbol.toLowerCase()}`,
+            'default_user',
+            p.symbol,
+            'broker_sahm',
+            p.quantity,
+            p.avgBuyPrice,
+            totalCost,
+            0,
+            now - (i + 1) * 86400000 * 5,
+            'OPEN',
+            now,
+            now,
+          ]);
+        }
+        posStmt.free();
+      }
+    } catch (err) {
+      console.error('[SQLite] Error seeding default portfolio:', err);
     }
   }
 

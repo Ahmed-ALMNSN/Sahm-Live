@@ -10,24 +10,30 @@ import {
   ZoomOut, 
   Layers, 
   Check,
-  X
+  X,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react';
-import { Language, ScreenWidthMode, ScreenDensityMode } from '../types.js';
+import { Language, ScreenWidthMode, ScreenDensityMode, SidebarMode } from '../types.js';
 
 interface ScreenSizeControllerProps {
   lang: Language;
   widthMode: ScreenWidthMode;
   densityMode: ScreenDensityMode;
+  sidebarMode?: SidebarMode;
   onChangeWidthMode: (mode: ScreenWidthMode) => void;
   onChangeDensityMode: (mode: ScreenDensityMode) => void;
+  onChangeSidebarMode?: (mode: SidebarMode) => void;
 }
 
 export const ScreenSizeController: React.FC<ScreenSizeControllerProps> = ({
   lang,
   widthMode,
   densityMode,
+  sidebarMode = 'normal',
   onChangeWidthMode,
   onChangeDensityMode,
+  onChangeSidebarMode,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -208,7 +214,43 @@ export const ScreenSizeController: React.FC<ScreenSizeControllerProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Native Fullscreen Toggle Button */}
+          {/* Section 3: Sidebar Mode (Compact / Normal) */}
+          {onChangeSidebarMode && (
+            <div className="mb-4">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-2">
+                {isAr ? 'عرض القوائم الجانبية (Sidebars):' : 'Sidebar & Drawers Display:'}
+              </label>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onChangeSidebarMode('normal')}
+                  className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition-all ${
+                    sidebarMode === 'normal'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <PanelRightOpen className="w-4 h-4" />
+                  <span>{isAr ? 'عادي (440px)' : 'Normal'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChangeSidebarMode('compact')}
+                  className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-semibold transition-all ${
+                    sidebarMode === 'compact'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold shadow-xs'
+                      : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-750 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <PanelRightClose className="w-4 h-4" />
+                  <span>{isAr ? 'مدمج (320px)' : 'Compact'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Native Fullscreen Toggle Button */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
             <button
               type="button"

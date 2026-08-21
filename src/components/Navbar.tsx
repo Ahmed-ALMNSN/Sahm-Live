@@ -20,7 +20,7 @@ import {
   Calculator,
   Briefcase
 } from 'lucide-react';
-import { Language, Theme, ScreenWidthMode, ScreenDensityMode } from '../types.js';
+import { Language, Theme, ScreenWidthMode, ScreenDensityMode, SidebarMode } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { computeLiveMarketStatus, MarketTimeInfo } from '../utils/marketHours.js';
 import { BowArrowIcon } from './BowArrowIcon.js';
@@ -33,8 +33,10 @@ interface NavbarProps {
   onToggleTheme: () => void;
   widthMode: ScreenWidthMode;
   densityMode: ScreenDensityMode;
+  sidebarMode?: SidebarMode;
   onChangeWidthMode: (mode: ScreenWidthMode) => void;
   onChangeDensityMode: (mode: ScreenDensityMode) => void;
+  onChangeSidebarMode?: (mode: SidebarMode) => void;
   notificationPermission: NotificationPermission;
   onRequestNotifications: () => void;
   onOpenUpload: () => void;
@@ -61,8 +63,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   widthMode,
   densityMode,
+  sidebarMode = 'normal',
   onChangeWidthMode,
   onChangeDensityMode,
+  onChangeSidebarMode,
   notificationPermission,
   onRequestNotifications,
   onOpenUpload,
@@ -371,8 +375,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             lang={lang}
             widthMode={widthMode}
             densityMode={densityMode}
+            sidebarMode={sidebarMode}
             onChangeWidthMode={onChangeWidthMode}
             onChangeDensityMode={onChangeDensityMode}
+            onChangeSidebarMode={onChangeSidebarMode}
           />
 
           {/* Theme Toggle Button (Light / Dark) */}

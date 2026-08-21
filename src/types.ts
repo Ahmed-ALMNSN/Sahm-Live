@@ -2,6 +2,7 @@ export type Language = 'ar' | 'en';
 export type Theme = 'dark' | 'light';
 export type ScreenWidthMode = 'fluid' | 'wide' | 'standard';
 export type ScreenDensityMode = 'compact' | 'normal' | 'comfortable';
+export type SidebarMode = 'compact' | 'normal';
 
 export type FilterType = 
   | 'ALL' 

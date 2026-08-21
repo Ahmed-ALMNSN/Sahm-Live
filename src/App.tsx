@@ -7,7 +7,8 @@ import {
   AlertHistoryItem, 
   ParsedStockData,
   ScreenWidthMode,
-  ScreenDensityMode
+  ScreenDensityMode,
+  SidebarMode
 } from './types.js';
 import { getTranslation } from './i18n/index.js';
 import { Navbar } from './components/Navbar.js';
@@ -21,12 +22,14 @@ import { AlertNotificationBanner } from './components/AlertNotificationBanner.js
 import { StockReportModal } from './components/StockReportModal.js';
 import { CalculatorModal } from './components/CalculatorModal.js';
 import { PortfolioModal } from './components/PortfolioModal.js';
+import { PortfolioChartSection } from './components/PortfolioChartSection.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { StockReportPage } from './pages/StockReportPage.js';
 import { ProfessionalReportData, generateProfessionalReport } from './utils/reportEngine.js';
 import { alertEngine } from './utils/alertEngine.js';
 import { apiService } from './services/api.js';
 import { calculateStockMfi } from './utils/moneyFlow.js';
+import { Layers, BarChart3, TableProperties } from 'lucide-react';
 
 const DEFAULT_STOCKS: StockItem[] = [
   {
@@ -246,12 +249,46 @@ export default function App() {
     return (saved as ScreenDensityMode) || 'normal';
   });
 
+  // 10. Compact Sidebar & Drawer Mode State
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>(() => {
+    const saved = localStorage.getItem('sahm_sidebar_mode');
+    return (saved as SidebarMode) || 'normal';
+  });
+
+  const handleToggleSidebarMode = useCallback(() => {
+    setSidebarMode((prev) => {
+      const next = prev === 'compact' ? 'normal' : 'compact';
+      localStorage.setItem('sahm_sidebar_mode', next);
+      return next;
+    });
+  }, []);
+
+  // 11. Dashboard View Mode: combined, chart, table
+  const [dashboardView, setDashboardView] = useState<'combined' | 'chart' | 'table'>(() => {
+    return (localStorage.getItem('sahm_dashboard_view') as 'combined' | 'chart' | 'table') || 'combined';
+  });
+
+  const handleSetDashboardView = (view: 'combined' | 'chart' | 'table') => {
+    setDashboardView(view);
+    localStorage.setItem('sahm_dashboard_view', view);
+  };
+
   // Sync Density Mode to HTML element
   useEffect(() => {
     document.documentElement.classList.remove('density-compact', 'density-normal', 'density-comfortable');
     document.documentElement.classList.add(`density-${screenDensityMode}`);
     localStorage.setItem('sahm_screen_density', screenDensityMode);
   }, [screenDensityMode]);
+
+  // Sync Sidebar Compact Mode to HTML element
+  useEffect(() => {
+    if (sidebarMode === 'compact') {
+      document.documentElement.classList.add('sidebar-compact');
+    } else {
+      document.documentElement.classList.remove('sidebar-compact');
+    }
+    localStorage.setItem('sahm_sidebar_mode', sidebarMode);
+  }, [sidebarMode]);
 
   // Sync Screen Width Mode to localStorage
   useEffect(() => {
@@ -991,8 +1028,10 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         widthMode={screenWidthMode}
         densityMode={screenDensityMode}
+        sidebarMode={sidebarMode}
         onChangeWidthMode={setScreenWidthMode}
         onChangeDensityMode={setScreenDensityMode}
+        onChangeSidebarMode={setSidebarMode}
         notificationPermission={notificationPermission}
         onRequestNotifications={handleRequestNotifications}
         onOpenUpload={() => setIsUploadModalOpen(true)}
@@ -1024,21 +1063,71 @@ export default function App() {
           lang={lang}
         />
 
-        {/* Live Real-Time Stock Table */}
-        <LiveStockTable
-          stocks={stocks}
-          lang={lang}
-          onUpdateAlerts={handleUpdateAlerts}
-          onDeleteStock={handleDeleteStock}
-          onClearAllStocks={handleClearAllStocks}
-          onClearAllAlerts={handleClearAllAlerts}
-          onSelectStock={(sym) => setSelectedStockSymbol(sym)}
-          onTestTriggerAlert={handleTestTriggerAlert}
-          onOpenCalculator={(stock) => {
-            setCalculatorStockSymbol(stock.symbol);
-            setIsCalculatorModalOpen(true);
-          }}
-        />
+        {/* Dashboard View Mode Selector */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex items-center gap-1 sm:gap-1.5 p-1 bg-white dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs text-xs font-semibold flex-wrap max-w-full">
+            <button
+              onClick={() => handleSetDashboardView('combined')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shrink-0 ${
+                dashboardView === 'combined'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{lang === 'ar' ? 'عرض شامل (الرسومات والجدول)' : 'Combined (Charts & Table)'}</span>
+            </button>
+            <button
+              onClick={() => handleSetDashboardView('chart')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shrink-0 ${
+                dashboardView === 'chart'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{lang === 'ar' ? 'الرسم البياني للمحفظة' : 'Portfolio Profit Charts'}</span>
+            </button>
+            <button
+              onClick={() => handleSetDashboardView('table')}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shrink-0 ${
+                dashboardView === 'table'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              <TableProperties className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{lang === 'ar' ? 'جدول المراقبة المباشر' : 'Live Watchlist'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Portfolio Visual Chart Section (Shown in combined and chart views) */}
+        {(dashboardView === 'combined' || dashboardView === 'chart') && (
+          <PortfolioChartSection
+            watchlistStocks={stocks}
+            lang={lang}
+            onOpenPortfolioModal={() => setIsPortfolioModalOpen(true)}
+          />
+        )}
+
+        {/* Live Real-Time Stock Table (Shown in combined and table views) */}
+        {(dashboardView === 'combined' || dashboardView === 'table') && (
+          <LiveStockTable
+            stocks={stocks}
+            lang={lang}
+            onUpdateAlerts={handleUpdateAlerts}
+            onDeleteStock={handleDeleteStock}
+            onClearAllStocks={handleClearAllStocks}
+            onClearAllAlerts={handleClearAllAlerts}
+            onSelectStock={(sym) => setSelectedStockSymbol(sym)}
+            onTestTriggerAlert={handleTestTriggerAlert}
+            onOpenCalculator={(stock) => {
+              setCalculatorStockSymbol(stock.symbol);
+              setIsCalculatorModalOpen(true);
+            }}
+          />
+        )}
 
       </main>
 
@@ -1046,20 +1135,20 @@ export default function App() {
       <footer className="min-h-9 py-2.5 bg-white dark:bg-[#0a0b0d] border-t border-slate-200 dark:border-slate-800/80 font-mono select-none safe-bottom transition-colors duration-200">
         <div className={`${containerWidthClass} flex flex-wrap items-center justify-between text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 gap-2`}>
           <div className="flex items-center flex-wrap gap-2.5 sm:gap-4">
-            <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+            <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300 shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="text-slate-500 dark:text-slate-400">DATABASE:</span> SQLITE (SINGLE SOURCE OF TRUTH)
             </span>
             <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline shrink-0">
               <span className="text-slate-500 dark:text-slate-400">FEED:</span> LIVE US EQUITIES
             </span>
             <span className="hidden md:inline text-slate-300 dark:text-slate-600">•</span>
-            <span className="hidden md:inline">
+            <span className="hidden md:inline shrink-0">
               <span className="text-slate-500 dark:text-slate-400">INTERVAL:</span> {refreshInterval / 1000}s
             </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM QUANT ENGINE v3.0</span>
             <span className="text-slate-300 dark:text-slate-600">•</span>
             <span className="text-emerald-600 dark:text-emerald-400 font-bold">200 OK</span>
@@ -1140,6 +1229,8 @@ export default function App() {
         onSelectStock={(sym) => setSelectedStockSymbol(sym)}
         notificationPermission={notificationPermission}
         onRequestNotifications={handleRequestNotifications}
+        sidebarMode={sidebarMode}
+        onToggleSidebarMode={handleToggleSidebarMode}
       />
 
       {/* Stock Executive Report Modal (Print & PDF Export) */}

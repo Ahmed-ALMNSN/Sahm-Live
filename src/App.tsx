@@ -5,7 +5,9 @@ import {
   StockItem, 
   AlertNotification, 
   AlertHistoryItem, 
-  ParsedStockData 
+  ParsedStockData,
+  ScreenWidthMode,
+  ScreenDensityMode
 } from './types.js';
 import { getTranslation } from './i18n/index.js';
 import { Navbar } from './components/Navbar.js';
@@ -232,6 +234,29 @@ export default function App() {
   const [selectedStockSymbol, setSelectedStockSymbol] = useState<string | null>(null);
   const [activeReport, setActiveReport] = useState<{ data: ProfessionalReportData; stock: StockItem } | null>(null);
   const [isRefreshingReport, setIsRefreshingReport] = useState(false);
+
+  // 9. Screen Width & Density Layout State
+  const [screenWidthMode, setScreenWidthMode] = useState<ScreenWidthMode>(() => {
+    const saved = localStorage.getItem('sahm_screen_width');
+    return (saved as ScreenWidthMode) || 'wide';
+  });
+
+  const [screenDensityMode, setScreenDensityMode] = useState<ScreenDensityMode>(() => {
+    const saved = localStorage.getItem('sahm_screen_density');
+    return (saved as ScreenDensityMode) || 'normal';
+  });
+
+  // Sync Density Mode to HTML element
+  useEffect(() => {
+    document.documentElement.classList.remove('density-compact', 'density-normal', 'density-comfortable');
+    document.documentElement.classList.add(`density-${screenDensityMode}`);
+    localStorage.setItem('sahm_screen_density', screenDensityMode);
+  }, [screenDensityMode]);
+
+  // Sync Screen Width Mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('sahm_screen_width', screenWidthMode);
+  }, [screenWidthMode]);
 
   // Ref lock to prevent overlapping quote batches
   const isFetchingRef = useRef(false);
@@ -948,6 +973,13 @@ export default function App() {
     );
   }
 
+  const containerWidthClass = 
+    screenWidthMode === 'fluid'
+      ? 'w-full px-2 sm:px-4 lg:px-6'
+      : screenWidthMode === 'wide'
+        ? 'w-full max-w-[1920px] mx-auto px-2.5 sm:px-5 lg:px-8'
+        : 'w-full max-w-[1440px] mx-auto px-2.5 sm:px-5 lg:px-8';
+
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#0a0b0d] text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       
@@ -957,6 +989,10 @@ export default function App() {
         onToggleLang={handleToggleLang}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        widthMode={screenWidthMode}
+        densityMode={screenDensityMode}
+        onChangeWidthMode={setScreenWidthMode}
+        onChangeDensityMode={setScreenDensityMode}
         notificationPermission={notificationPermission}
         onRequestNotifications={handleRequestNotifications}
         onOpenUpload={() => setIsUploadModalOpen(true)}
@@ -977,7 +1013,7 @@ export default function App() {
       />
 
       {/* Main Dashboard Content */}
-      <main className="flex-1 w-full max-w-[1680px] mx-auto px-2.5 sm:px-5 lg:px-8 py-3.5 sm:py-6">
+      <main className={`flex-1 ${containerWidthClass} py-3.5 sm:py-6 transition-all duration-200`}>
         
         {/* KPI Financial Overview Cards */}
         <KpiCards
@@ -1007,25 +1043,27 @@ export default function App() {
       </main>
 
       {/* Technical Dashboard Telemetry Footer */}
-      <footer className="min-h-9 py-2.5 bg-white dark:bg-[#0a0b0d] border-t border-slate-200 dark:border-slate-800/80 flex flex-wrap items-center justify-between px-3 sm:px-6 lg:px-8 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono select-none gap-2 safe-bottom transition-colors duration-200">
-        <div className="flex items-center flex-wrap gap-2.5 sm:gap-4">
-          <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span className="text-slate-500 dark:text-slate-400">DATABASE:</span> SQLITE (SINGLE SOURCE OF TRUTH)
-          </span>
-          <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
-          <span className="hidden sm:inline">
-            <span className="text-slate-500 dark:text-slate-400">FEED:</span> LIVE US EQUITIES
-          </span>
-          <span className="hidden md:inline text-slate-300 dark:text-slate-600">•</span>
-          <span className="hidden md:inline">
-            <span className="text-slate-500 dark:text-slate-400">INTERVAL:</span> {refreshInterval / 1000}s
-          </span>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM QUANT ENGINE v3.0</span>
-          <span className="text-slate-300 dark:text-slate-600">•</span>
-          <span className="text-emerald-600 dark:text-emerald-400 font-bold">200 OK</span>
+      <footer className="min-h-9 py-2.5 bg-white dark:bg-[#0a0b0d] border-t border-slate-200 dark:border-slate-800/80 font-mono select-none safe-bottom transition-colors duration-200">
+        <div className={`${containerWidthClass} flex flex-wrap items-center justify-between text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 gap-2`}>
+          <div className="flex items-center flex-wrap gap-2.5 sm:gap-4">
+            <span className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-slate-500 dark:text-slate-400">DATABASE:</span> SQLITE (SINGLE SOURCE OF TRUTH)
+            </span>
+            <span className="hidden sm:inline text-slate-300 dark:text-slate-600">•</span>
+            <span className="hidden sm:inline">
+              <span className="text-slate-500 dark:text-slate-400">FEED:</span> LIVE US EQUITIES
+            </span>
+            <span className="hidden md:inline text-slate-300 dark:text-slate-600">•</span>
+            <span className="hidden md:inline">
+              <span className="text-slate-500 dark:text-slate-400">INTERVAL:</span> {refreshInterval / 1000}s
+            </span>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">SAHM QUANT ENGINE v3.0</span>
+            <span className="text-slate-300 dark:text-slate-600">•</span>
+            <span className="text-emerald-600 dark:text-emerald-400 font-bold">200 OK</span>
+          </div>
         </div>
       </footer>
 

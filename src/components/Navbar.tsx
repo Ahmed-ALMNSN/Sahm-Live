@@ -20,16 +20,21 @@ import {
   Calculator,
   Briefcase
 } from 'lucide-react';
-import { Language, Theme } from '../types.js';
+import { Language, Theme, ScreenWidthMode, ScreenDensityMode } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { computeLiveMarketStatus, MarketTimeInfo } from '../utils/marketHours.js';
 import { BowArrowIcon } from './BowArrowIcon.js';
+import { ScreenSizeController } from './ScreenSizeController.js';
 
 interface NavbarProps {
   lang: Language;
   onToggleLang: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  widthMode: ScreenWidthMode;
+  densityMode: ScreenDensityMode;
+  onChangeWidthMode: (mode: ScreenWidthMode) => void;
+  onChangeDensityMode: (mode: ScreenDensityMode) => void;
   notificationPermission: NotificationPermission;
   onRequestNotifications: () => void;
   onOpenUpload: () => void;
@@ -54,6 +59,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleLang,
   theme,
   onToggleTheme,
+  widthMode,
+  densityMode,
+  onChangeWidthMode,
+  onChangeDensityMode,
   notificationPermission,
   onRequestNotifications,
   onOpenUpload,
@@ -125,9 +134,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const marketBadge = getMarketBadge();
 
+  const containerWidthClass = 
+    widthMode === 'fluid' 
+      ? 'w-full' 
+      : widthMode === 'wide' 
+        ? 'w-full max-w-[1920px] mx-auto' 
+        : 'w-full max-w-[1440px] mx-auto';
+
   return (
-    <header className="sticky top-0 z-30 w-full min-h-[70px] sm:min-h-[76px] py-3 sm:py-4 border-b border-slate-200 dark:border-slate-800/90 bg-white/95 dark:bg-[#0f1115]/95 backdrop-blur-lg text-slate-800 dark:text-slate-200 flex items-center px-4 sm:px-6 lg:px-10 font-sans shadow-xs dark:shadow-md transition-colors duration-200 safe-top">
-      <div className="w-full max-w-[1680px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
+    <header className="sticky top-0 z-30 w-full min-h-[70px] sm:min-h-[76px] py-3 sm:py-4 border-b border-slate-200 dark:border-slate-800/90 bg-white/95 dark:bg-[#0f1115]/95 backdrop-blur-lg text-slate-800 dark:text-slate-200 flex items-center px-3 sm:px-6 lg:px-8 font-sans shadow-xs dark:shadow-md transition-colors duration-200 safe-top">
+      <div className={`${containerWidthClass} flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 transition-all duration-200`}>
         
         {/* Logo & Market Badge */}
         <div className="flex items-center justify-between md:justify-start gap-3 sm:gap-5 w-full md:w-auto">
@@ -348,6 +364,15 @@ export const Navbar: React.FC<NavbarProps> = ({
               </span>
             )}
           </button>
+
+          {/* Screen Size & Viewport Fit Controller */}
+          <ScreenSizeController
+            lang={lang}
+            widthMode={widthMode}
+            densityMode={densityMode}
+            onChangeWidthMode={onChangeWidthMode}
+            onChangeDensityMode={onChangeDensityMode}
+          />
 
           {/* Theme Toggle Button (Light / Dark) */}
           <button

@@ -26,6 +26,18 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  html.density-compact, html.density-compact body {
+    font-size: 13.5px;
+  }
+
+  html.density-normal, html.density-normal body {
+    font-size: 15px;
+  }
+
+  html.density-comfortable, html.density-comfortable body {
+    font-size: 16.5px;
+  }
+
   [dir="rtl"], [lang="ar"], .arabic-text {
     font-family: var(--font-cairo);
     letter-spacing: normal !important;

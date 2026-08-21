@@ -1124,6 +1124,8 @@ export default function App() {
         <PortfolioModal
           isOpen={isPortfolioModalOpen}
           onClose={() => setIsPortfolioModalOpen(false)}
+          watchlistStocks={stocks}
+          lang={lang}
         />
       </ErrorBoundary>
 

@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { createServer as createViteServer } from 'vite';
 import { marketService } from './server/src/services/MarketService.js';
 import { analysisService } from './server/src/services/AnalysisService.js';
+import { macroService } from './server/src/services/MacroService.js';
 import { sqliteDb } from './server/src/database/sqlite.js';
 import { TradingCalculationService } from './server/src/services/TradingCalculationService.js';
 
@@ -256,6 +257,32 @@ async function startServer() {
   app.get('/api/analysis/:symbol', handleAnalysis);
   app.get('/api/stocks/:symbol/analysis', handleAnalysis);
 
+  // --- MACROECONOMIC INDICATORS & US MONETARY POLICY ---
+  app.get('/api/macro', async (req: Request, res: Response) => {
+    try {
+      const data = await macroService.getMacroData();
+      res.json({ success: true, data });
+    } catch (err: any) {
+      console.error('Error fetching macro data:', err);
+      res.status(500).json({ success: false, error: { code: 'MACRO_DATA_ERROR', message: err.message } });
+    }
+  });
+
+  app.get('/api/macro/stock/:symbol', async (req: Request, res: Response) => {
+    try {
+      const symbol = req.params.symbol?.trim().toUpperCase();
+      const sector = (req.query.sector as string) || 'General';
+      const [macroData, impact] = await Promise.all([
+        macroService.getMacroData(),
+        macroService.evaluateStockMacroImpact(symbol, sector),
+      ]);
+      res.json({ success: true, data: { macro: macroData, impact } });
+    } catch (err: any) {
+      console.error(`Error evaluating macro impact for ${req.params.symbol}:`, err);
+      res.status(500).json({ success: false, error: { code: 'MACRO_STOCK_ERROR', message: err.message } });
+    }
+  });
+
   // --- WATCHLIST & STOCKS CRUD (DB AS SINGLE SOURCE OF TRUTH) ---
 
   // Get current watchlist (Returns items from SQLite)
@@ -357,20 +384,62 @@ async function startServer() {
     }
   });
 
-  // Import Watchlist with Job Audit
-  app.post('/api/watchlist/import', (req: Request, res: Response) => {
+  // Import Stocks & Watchlist with Validation and Arabic Error Messages
+  const handleImportStocks = (req: Request, res: Response) => {
     try {
       const { stocks, filename, fileType } = req.body;
-      if (!Array.isArray(stocks)) {
-        return res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'stocks array required' } });
+      if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { 
+            code: 'INVALID_INPUT', 
+            message: 'تنسيق الملف أو البيانات غير صحيح: يجب توفير قائمة بالأسهم تحتوي على رمز السهم (Symbol).' 
+          } 
+        });
       }
 
-      const result = sqliteDb.importWatchlistStocks(stocks, filename || 'import.csv', fileType || 'csv');
-      res.json(result);
+      // Sanitize and validate stock items ensuring Symbol, UpperAlert, LowerAlert compatibility
+      const sanitizedStocks = stocks.map((s: any) => ({
+        symbol: String(s.symbol || s.ticker || s.Symbol || s.Ticker || '').trim().toUpperCase(),
+        companyName: s.companyName || s.name || s.CompanyName || undefined,
+        sector: s.sector || s.Sector || undefined,
+        exchange: s.exchange || s.Exchange || 'US',
+        upperAlert: s.upperAlert !== undefined && s.upperAlert !== null && !isNaN(Number(s.upperAlert)) ? Number(s.upperAlert) : null,
+        lowerAlert: s.lowerAlert !== undefined && s.lowerAlert !== null && !isNaN(Number(s.lowerAlert)) ? Number(s.lowerAlert) : null,
+        alertsEnabled: s.alertsEnabled !== undefined ? Boolean(s.alertsEnabled) : true,
+        buyPrice: s.buyPrice !== undefined && s.buyPrice !== null && !isNaN(Number(s.buyPrice)) ? Number(s.buyPrice) : null,
+        shares: s.shares !== undefined && s.shares !== null && !isNaN(Number(s.shares)) ? Number(s.shares) : null,
+        brokerId: s.brokerId || 'broker_sahm',
+      })).filter((s: any) => s.symbol && /^[A-Z0-9.\-=]{1,10}$/.test(s.symbol));
+
+      if (sanitizedStocks.length === 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: { 
+            code: 'NO_VALID_STOCKS', 
+            message: 'تنسيق الملف غير صحيح: لم يتم العثور على أي رموز أسهم صالحة. يرجى التأكد من مطابقة أعمدة الملف (Symbol, UpperAlert, LowerAlert).' 
+          } 
+        });
+      }
+
+      const result = sqliteDb.importWatchlistStocks(sanitizedStocks, filename || 'import.csv', fileType || 'csv');
+      res.json({
+        ...result,
+        message: `تم استيراد ${result.importedCount} سهم بنجاح ومطابقة أعمدة التنبيهات.`
+      });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: { code: 'IMPORT_ERROR', message: err.message } });
+      res.status(500).json({ 
+        success: false, 
+        error: { 
+          code: 'IMPORT_ERROR', 
+          message: `حدث خطأ أثناء معالجة استيراد الملف: ${err.message}` 
+        } 
+      });
     }
-  });
+  };
+
+  app.post('/api/stocks/import', handleImportStocks);
+  app.post('/api/watchlist/import', handleImportStocks);
 
   // Delete single stock from watchlist permanently
   app.delete('/api/watchlist/:symbol', (req: Request, res: Response) => {

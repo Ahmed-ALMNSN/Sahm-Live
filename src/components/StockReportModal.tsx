@@ -10,12 +10,13 @@ import {
   FileText,
   CheckCircle2,
   ShieldCheck,
-  FileDown
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { StockItem, Language } from '../types.js';
 import { getTranslation } from '../i18n/index.js';
 import { BowArrowIcon } from './BowArrowIcon.js';
-import { exportElementToPdf } from '../utils/pdfExport.js';
+import { exportElementToPdf, printHtmlElement } from '../utils/pdfExport.js';
 
 interface StockReportModalProps {
   isOpen: boolean;
@@ -32,6 +33,9 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
 }) => {
   const t = getTranslation(lang);
   const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
   const printableAreaRef = useRef<HTMLDivElement>(null);
 
   const reportDate = useMemo(() => {
@@ -87,16 +91,38 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
     };
   }, [stocks, lang]);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!printableAreaRef.current || isPrinting) return;
+    setIsPrinting(true);
+    setPrintSuccess(false);
+    try {
+      const fileName = `Sahm_Market_Report_${new Date().toISOString().split('T')[0]}.pdf`;
+      const res = await printHtmlElement(printableAreaRef.current, {
+        title: lang === 'ar' ? 'تقرير_التقييم_السوقي_للأسهم' : 'Sahm_Market_Valuation_Report',
+        fileName,
+      });
+      if (res.success) {
+        setPrintSuccess(true);
+        setTimeout(() => setPrintSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error('Failed to print report:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleExportPdf = async () => {
-    if (!printableAreaRef.current) return;
+    if (!printableAreaRef.current || isExporting) return;
     setIsExporting(true);
+    setExportSuccess(false);
     try {
       const fileName = `Sahm_Market_Report_${new Date().toISOString().split('T')[0]}.pdf`;
-      await exportElementToPdf(printableAreaRef.current, { fileName });
+      const ok = await exportElementToPdf(printableAreaRef.current, { fileName });
+      if (ok) {
+        setExportSuccess(true);
+        setTimeout(() => setExportSuccess(false), 3000);
+      }
     } catch (err) {
       console.error('Failed to export PDF:', err);
     } finally {
@@ -130,23 +156,50 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Save Report Button */}
             <button
               id="btn-export-pdf-action"
               onClick={handleExportPdf}
               disabled={isExporting}
-              className="px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white shadow-md active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer disabled:opacity-50"
+              title={lang === 'ar' ? 'حفظ التقرير كملف PDF عالي الجودة' : 'Save Report as PDF'}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer disabled:opacity-50 ${
+                exportSuccess 
+                  ? 'bg-emerald-600 text-white' 
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20'
+              }`}
             >
-              <FileDown className={`w-4 h-4 text-emerald-400 ${isExporting ? 'animate-bounce' : ''}`} />
-              <span>{isExporting ? (lang === 'ar' ? 'جاري التحميل...' : 'Exporting...') : (lang === 'ar' ? 'تحميل PDF' : 'Download PDF')}</span>
+              {exportSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-white" />
+                  <span>{lang === 'ar' ? 'تم حفظ التقرير!' : 'Report Saved!'}</span>
+                </>
+              ) : (
+                <>
+                  <FileDown className={`w-4 h-4 text-white ${isExporting ? 'animate-bounce' : ''}`} />
+                  <span>{isExporting ? (lang === 'ar' ? 'جاري حفظ التقرير...' : 'Saving...') : (lang === 'ar' ? 'حفظ التقرير (PDF)' : 'Save Report (PDF)')}</span>
+                </>
+              )}
             </button>
 
             <button
               id="btn-print-action"
               onClick={handlePrint}
-              className="px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer"
+              disabled={isPrinting}
+              title={lang === 'ar' ? 'طباعة التقرير مباشرة' : 'Print Report'}
+              className={`px-3.5 sm:px-4 py-2 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all flex items-center gap-2 font-sans cursor-pointer disabled:opacity-50 ${
+                printSuccess
+                  ? 'bg-emerald-700 text-white'
+                  : isPrinting
+                  ? 'bg-slate-700 text-white opacity-80 cursor-wait'
+                  : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white'
+              }`}
             >
-              <Printer className="w-4 h-4" />
-              <span>{t.report.btnPrint}</span>
+              {isPrinting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
+              <span>{isPrinting ? (lang === 'ar' ? 'جاري التجهيز...' : 'Preparing...') : t.report.btnPrint}</span>
             </button>
 
             <button
@@ -160,7 +213,12 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
         </div>
 
         {/* Printable Report Content Body */}
-        <div ref={printableAreaRef} className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-slate-50/50 dark:bg-[#0a0b0d] print:bg-white print:text-black">
+        <div 
+          ref={printableAreaRef} 
+          dir={lang === 'ar' ? 'rtl' : 'ltr'} 
+          lang={lang} 
+          className="p-6 sm:p-8 overflow-y-auto space-y-6 bg-slate-50/50 dark:bg-[#0a0b0d] print:bg-white print:text-black arabic-text"
+        >
           
           {/* Executive Report Brand Header */}
           <div className="border-b border-slate-200 dark:border-slate-800 print:border-slate-300 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -170,7 +228,7 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0.5" dir="ltr">
-                  <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white print:text-slate-900 font-mono" style={{ direction: 'ltr' }}>
+                  <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white print:text-slate-900 font-mono" style={{ direction: 'ltr' }}>
                     <span className="text-emerald-600 dark:text-emerald-400 print:text-emerald-600 font-extrabold">JM</span><span className="font-bold">Apps</span> <span className="text-xs text-slate-500 dark:text-slate-400 print:text-slate-500 font-sans font-normal">LIVE MONITOR</span>
                   </span>
                 </div>
@@ -200,7 +258,7 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
 
           {/* Executive Summary Metric Cards */}
           <div>
-            <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
+            <h3 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
               <span>{t.report.executiveSummary}</span>
             </h3>
             
@@ -263,7 +321,7 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
 
           {/* Sector Breakdown Section */}
           <div>
-            <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
+            <h3 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
               <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 print:text-slate-700" />
               <span>{t.report.sectorBreakdown}</span>
             </h3>
@@ -300,14 +358,14 @@ export const StockReportModal: React.FC<StockReportModalProps> = ({
 
           {/* Full Stock Valuation & Alert Limits Table */}
           <div>
-            <h3 className="text-sm sm:text-base font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
+            <h3 className="text-sm sm:text-base font-bold text-slate-700 dark:text-slate-300 print:text-slate-800 mb-3 flex items-center gap-2 font-sans">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 print:text-slate-700" />
               <span>{t.report.fullStockTable}</span>
             </h3>
 
             <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 print:border-slate-300 shadow-2xs">
               <table className="w-full text-left rtl:text-right border-collapse text-sm">
-                <thead className="bg-slate-100 dark:bg-[#161b22] print:bg-slate-100 text-xs font-bold text-slate-600 dark:text-slate-400 print:text-slate-700 uppercase tracking-wider border-b border-slate-200 dark:border-slate-800 print:border-slate-300">
+                <thead className="bg-slate-100 dark:bg-[#161b22] print:bg-slate-100 text-xs font-bold text-slate-600 dark:text-slate-400 print:text-slate-700 border-b border-slate-200 dark:border-slate-800 print:border-slate-300">
                   <tr>
                     <th className="py-3 px-3.5">{t.report.symbol}</th>
                     <th className="py-3 px-3.5">{t.report.name}</th>

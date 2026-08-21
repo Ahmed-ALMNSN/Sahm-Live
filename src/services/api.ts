@@ -9,6 +9,7 @@ import {
   ImportJobRecord,
   AuditLogRecord,
 } from '../types.js';
+import { MacroeconomicData, StockMacroImpact } from '../types/macroTypes.js';
 
 export interface BatchQuotesResponse {
   quotes: StockQuote[];
@@ -124,6 +125,32 @@ export class ApiService {
       return data.data || null;
     } catch (err) {
       console.error(`fetchFullAnalysis error for ${symbol}:`, err);
+      return null;
+    }
+  }
+
+  // --- MACROECONOMIC DATA & US MONETARY POLICY ---
+
+  async fetchMacroData(): Promise<MacroeconomicData | null> {
+    try {
+      const res = await fetch('/api/macro');
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data || null;
+    } catch (err) {
+      console.error('fetchMacroData error:', err);
+      return null;
+    }
+  }
+
+  async fetchStockMacroImpact(symbol: string, sector: string = 'General'): Promise<{ macro: MacroeconomicData; impact: StockMacroImpact } | null> {
+    try {
+      const res = await fetch(`/api/macro/stock/${encodeURIComponent(symbol)}?sector=${encodeURIComponent(sector)}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.data || null;
+    } catch (err) {
+      console.error(`fetchStockMacroImpact error for ${symbol}:`, err);
       return null;
     }
   }

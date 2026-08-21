@@ -27,6 +27,7 @@ export const PDFReportTemplate: React.FC<PDFReportTemplateProps> = ({
     volume,
     supportResistance,
     risk,
+    macro,
     tradingPlan,
     scenarios,
     invalidationConditions,
@@ -241,13 +242,15 @@ export const PDFReportTemplate: React.FC<PDFReportTemplateProps> = ({
     <div
       id={containerId}
       dir={isAr ? 'rtl' : 'ltr'}
-      className="bg-white text-slate-900 mx-auto transition-colors print:p-0"
+      lang={lang}
+      className="bg-white text-slate-900 mx-auto transition-colors print:p-0 arabic-text"
       style={{
         width: '100%',
         maxWidth: '880px',
         backgroundColor: '#ffffff',
         color: '#0f172a',
-        fontFamily: isAr ? "'Cairo', 'Segoe UI', Tahoma, sans-serif" : "'Inter', -apple-system, sans-serif",
+        fontFamily: "'Cairo', system-ui, -apple-system, sans-serif",
+        letterSpacing: 'normal',
       }}
     >
       {/* ================= 1. INSTITUTIONAL REPORT HEADER ================= */}
@@ -255,7 +258,7 @@ export const PDFReportTemplate: React.FC<PDFReportTemplateProps> = ({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded bg-slate-900 text-white font-mono font-bold text-xs uppercase tracking-wider">
+              <span className="px-2.5 py-0.5 rounded bg-slate-900 text-white font-mono font-bold text-xs">
                 {isAr ? 'تقرير بحوث واستثمار كمي' : 'Institutional Equity Research'}
               </span>
               <span className="text-xs text-slate-500 font-mono">
@@ -990,6 +993,71 @@ export const PDFReportTemplate: React.FC<PDFReportTemplateProps> = ({
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================= 8.5 MACROECONOMIC & US MONETARY POLICY ANALYSIS ================= */}
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4" style={{ breakInside: 'avoid' }}>
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+            {isAr ? 'المؤشرات الاقتصادية الكلية وسياسة الفيدرالي الأمريكي' : 'Macroeconomic Indicators & US Monetary Policy'}
+          </h3>
+          <span className="text-[10px] font-mono text-slate-500 font-bold">
+            {isAr ? 'تأثير بيئة الفائدة والتضخم' : 'Macro & Rate Impact'}
+          </span>
+        </div>
+
+        {/* 4 Macro Metrics Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3 text-xs">
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] text-slate-500 block font-mono">{isAr ? 'التضخم العام (CPI):' : 'US CPI Inflation:'}</span>
+            <span className="font-mono font-black text-slate-900 text-sm">{macro?.cpiYoY ?? 2.9}%</span>
+            <span className="text-[9px] text-emerald-700 block mt-0.5">{isAr ? macro?.cpiTrendAr ?? 'تباطؤ تدريجي' : macro?.cpiTrendEn ?? 'Cooling'}</span>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] text-slate-500 block font-mono">{isAr ? 'فائدة الفيدرالي المستهدفة:' : 'Fed Funds Target:'}</span>
+            <span className="font-mono font-black text-slate-900 text-sm">{macro?.fedFundsTargetRange ?? '4.25% - 4.50%'}</span>
+            <span className="text-[9px] text-slate-500 block mt-0.5">{isAr ? 'نطاق تشديد مقيد' : 'Data-Dependent'}</span>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] text-slate-500 block font-mono">{isAr ? 'سندات 10 سنوات (10Y):' : '10Y Treasury Yield:'}</span>
+            <span className="font-mono font-black text-purple-700 text-sm">{macro?.treasury10Y ?? 4.28}%</span>
+            <span className="text-[9px] text-slate-500 block mt-0.5">Real: +{macro?.realInterestRate ?? 1.38}%</span>
+          </div>
+          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] text-slate-500 block font-mono">{isAr ? 'تقييم الأثر على السهم:' : 'Macro Impact Score:'}</span>
+            <span className="font-mono font-black text-emerald-700 text-sm">+{macro?.stockMacroScore ?? 25}/100</span>
+            <span className="text-[9px] text-emerald-700 block mt-0.5 truncate">{isAr ? macro?.impactRatingAr ?? 'دعم كلي معتدل' : macro?.impactRatingEn ?? 'Moderate Tailwind'}</span>
+          </div>
+        </div>
+
+        {/* Macro Commentary */}
+        <p className="text-xs text-slate-700 leading-relaxed p-2.5 rounded bg-slate-50 border border-slate-100 mb-2.5">
+          {isAr ? macro?.summaryAr : macro?.summaryEn}
+        </p>
+
+        {/* Tailwinds & Headwinds Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+          <div className="p-2.5 rounded bg-emerald-50/60 border border-emerald-200">
+            <span className="font-bold text-emerald-800 block mb-1">
+              {isAr ? 'المحفزات الكلية الداعمة للسهم:' : 'Macro Tailwinds:'}
+            </span>
+            <ul className="list-disc list-inside space-y-1 text-slate-700 text-[11px]">
+              {(isAr ? macro?.tailwindsAr : macro?.tailwindsEn)?.map((tw, idx) => (
+                <li key={idx}>{tw}</li>
+              )) || <li>{isAr ? 'تباطؤ معدلات التضخم يدعم استقرار تكاليف التشغيل.' : 'Cooling inflation stabilizes operational input costs.'}</li>}
+            </ul>
+          </div>
+          <div className="p-2.5 rounded bg-rose-50/60 border border-rose-200">
+            <span className="font-bold text-rose-800 block mb-1">
+              {isAr ? 'التحديات والمخاطر الكلية:' : 'Macro Headwinds:'}
+            </span>
+            <ul className="list-disc list-inside space-y-1 text-slate-700 text-[11px]">
+              {(isAr ? macro?.headwindsAr : macro?.headwindsEn)?.map((hw, idx) => (
+                <li key={idx}>{hw}</li>
+              )) || <li>{isAr ? 'بقاء الفائدة الحقيقية مرتفعة يفرض انضباطاً في مكررات التقييم.' : 'Positive real rates keep valuation multiples restrained.'}</li>}
+            </ul>
           </div>
         </div>
       </section>

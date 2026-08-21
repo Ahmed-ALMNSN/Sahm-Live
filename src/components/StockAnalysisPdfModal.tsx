@@ -13,11 +13,12 @@ import {
   Zap, 
   ShieldCheck,
   Award,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { StockItem, Language } from '../types.js';
 import { QuantitativeAnalysisResult } from '../utils/quantitativeEngine.js';
-import { exportElementToPdf } from '../utils/pdfExport.js';
+import { exportElementToPdf, printHtmlElement } from '../utils/pdfExport.js';
 
 interface StockAnalysisPdfModalProps {
   isOpen: boolean;
@@ -37,17 +38,25 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
   lang,
 }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const isAr = lang === 'ar';
 
   if (!isOpen) return null;
 
   const handleDownloadPdf = async () => {
-    if (!reportRef.current) return;
+    if (!reportRef.current || isExporting) return;
     setIsExporting(true);
+    setExportSuccess(false);
     try {
       const fileName = `${analysis.symbol}_Scientific_Analysis_${new Date().toISOString().split('T')[0]}.pdf`;
-      await exportElementToPdf(reportRef.current, { fileName });
+      const ok = await exportElementToPdf(reportRef.current, { fileName });
+      if (ok) {
+        setExportSuccess(true);
+        setTimeout(() => setExportSuccess(false), 3000);
+      }
     } catch (err) {
       console.error('PDF download error:', err);
     } finally {
@@ -55,8 +64,25 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!reportRef.current || isPrinting) return;
+    setIsPrinting(true);
+    setPrintSuccess(false);
+    try {
+      const fileName = `${analysis.symbol}_Scientific_Analysis_${new Date().toISOString().split('T')[0]}.pdf`;
+      const res = await printHtmlElement(reportRef.current, {
+        title: `${analysis.symbol}_Scientific_Analysis`,
+        fileName,
+      });
+      if (res.success) {
+        setPrintSuccess(true);
+        setTimeout(() => setPrintSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error('Print error:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const isPositive = analysis.change >= 0;
@@ -128,19 +154,41 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
               type="button"
               onClick={handleDownloadPdf}
               disabled={isExporting}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-900/30 transition cursor-pointer disabled:opacity-50"
+              title={isAr ? 'حفظ التقرير كملف PDF عالي الجودة' : 'Save Report as PDF'}
+              className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-white text-xs font-bold shadow-lg transition cursor-pointer disabled:opacity-50 ${
+                exportSuccess
+                  ? 'bg-emerald-600 shadow-emerald-900/30'
+                  : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/30'
+              }`}
             >
-              <FileDown className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
-              <span>{isExporting ? (isAr ? 'جاري إنشاء PDF...' : 'Generating PDF...') : (isAr ? 'تحميل ملف PDF' : 'Download PDF')}</span>
+              {exportSuccess ? (
+                <>
+                  <ShieldCheck className="w-4 h-4 text-white" />
+                  <span>{isAr ? 'تم حفظ التقرير!' : 'Report Saved!'}</span>
+                </>
+              ) : (
+                <>
+                  <FileDown className={`w-4 h-4 ${isExporting ? 'animate-bounce' : ''}`} />
+                  <span>{isExporting ? (isAr ? 'جاري حفظ التقرير...' : 'Saving...') : (isAr ? 'حفظ التقرير (PDF)' : 'Save Report (PDF)')}</span>
+                </>
+              )}
             </button>
 
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition cursor-pointer"
+              disabled={isPrinting}
+              title={isAr ? 'طباعة التقرير مباشرة أو حفظ كـ PDF' : 'Print / Save PDF'}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer disabled:opacity-50 ${
+                printSuccess
+                  ? 'bg-emerald-700 text-white border-emerald-600'
+                  : isPrinting
+                  ? 'bg-slate-800 text-slate-300 border-slate-700 opacity-80 cursor-wait'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+              }`}
             >
-              <Printer className="w-4 h-4" />
-              <span className="hidden sm:inline">{isAr ? 'طباعة / حفظ كـ PDF' : 'Print / Save PDF'}</span>
+              {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              <span className="hidden sm:inline">{isPrinting ? (isAr ? 'جاري التجهيز...' : 'Preparing...') : (isAr ? 'طباعة / حفظ كـ PDF' : 'Print / Save PDF')}</span>
             </button>
 
             <button
@@ -158,13 +206,15 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
           <div 
             ref={reportRef}
             id="printable-stock-report"
-            className="bg-white text-slate-900 rounded-xl p-6 sm:p-10 shadow-2xl max-w-3xl mx-auto font-sans print:shadow-none print:p-0 print:m-0"
+            dir={isAr ? 'rtl' : 'ltr'}
+            lang={lang}
+            className="bg-white text-slate-900 rounded-xl p-6 sm:p-10 shadow-2xl max-w-3xl mx-auto font-sans print:shadow-none print:p-0 print:m-0 arabic-text"
             style={{ minHeight: '1050px' }}
           >
             {/* Report Header */}
             <div className="border-b-2 border-slate-900 pb-5 mb-6 flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1" dir="ltr">
                   <span className="px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-lg">
                     {analysis.symbol}
                   </span>
@@ -175,7 +225,7 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
                     • {fullData?.sector || stock.sector || 'Equities'}
                   </span>
                 </div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900">
                   {fullData?.companyName || stock.companyName || analysis.symbol}
                 </h1>
                 <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1 font-mono">
@@ -201,7 +251,7 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
             {/* Executive Quantitative Verdict Banner */}
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 sm:p-5 mb-6 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className={`px-4 py-2 rounded-lg font-black text-sm uppercase tracking-wider ${decisionBadge.bg} shadow-sm`}>
+                <div className={`px-4 py-2 rounded-lg font-black text-sm ${decisionBadge.bg} shadow-sm`}>
                   {decisionBadge.label}
                 </div>
                 <div>
@@ -232,7 +282,7 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
 
             {/* Trade Plan & Execution Matrix */}
             <div className="mb-6">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
+              <h2 className="text-xs font-bold text-slate-500 mb-2.5 flex items-center gap-1.5">
                 <Target className="w-3.5 h-3.5 text-slate-700" />
                 <span>{isAr ? 'خطة التداول ونقاط الدخول والخروج' : 'Trade Setup & Execution Levels'}</span>
               </h2>
@@ -315,7 +365,7 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
 
             {/* Fundamental Health & Dilution Risk Matrix */}
             <div className="mb-6 border-t border-slate-200 pt-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5 flex items-center gap-1.5">
+              <h2 className="text-xs font-bold text-slate-500 mb-2.5 flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-slate-700" />
                 <span>{isAr ? 'الجودة المالية ومخاطر التخفيف' : 'Financial Quality & Dilution Shield'}</span>
               </h2>
@@ -341,7 +391,7 @@ export const StockAnalysisPdfModal: React.FC<StockAnalysisPdfModalProps> = ({
 
             {/* Catalysts & Market Insights */}
             <div className="mb-6 border-t border-slate-200 pt-4">
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+              <h2 className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
                 <Award className="w-3.5 h-3.5 text-slate-700" />
                 <span>{isAr ? 'الأخبار والمحفزات الجوهرية (Catalysts)' : 'Key News & Market Catalysts'}</span>
               </h2>

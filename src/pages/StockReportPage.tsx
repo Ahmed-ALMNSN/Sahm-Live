@@ -11,7 +11,7 @@ import {
   Share2
 } from 'lucide-react';
 import { ProfessionalReportData } from '../utils/reportEngine.js';
-import { exportElementToPdf } from '../utils/pdfExport.js';
+import { exportElementToPdf, printHtmlElement } from '../utils/pdfExport.js';
 import { PDFReportTemplate } from '../components/PDFReportTemplate.js';
 import { Language, Theme } from '../types.js';
 
@@ -38,10 +38,29 @@ export const StockReportPage: React.FC<StockReportPageProps> = ({
 }) => {
   const isAr = lang === 'ar';
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (isPrinting) return;
+    try {
+      setIsPrinting(true);
+      setPrintSuccess(false);
+      const symbolSafe = (report.company.symbol || 'STOCK').toUpperCase();
+      const res = await printHtmlElement('institutional-report-page-container', {
+        title: `${symbolSafe}_Institutional_Report`,
+        fileName: `${symbolSafe}_Institutional_Report_${new Date().toISOString().split('T')[0]}.pdf`,
+      });
+      if (res.success) {
+        setPrintSuccess(true);
+        setTimeout(() => setPrintSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error('Print failed:', err);
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -139,19 +158,26 @@ export const StockReportPage: React.FC<StockReportPageProps> = ({
             <button
               type="button"
               onClick={handlePrint}
+              disabled={isPrinting}
               title={isAr ? 'طباعة التقرير مباشرة (A4)' : 'Print Report (A4)'}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-xs sm:text-sm shadow-sm transition cursor-pointer"
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white font-bold text-xs sm:text-sm shadow-sm transition cursor-pointer disabled:opacity-50 ${
+                printSuccess
+                  ? 'bg-emerald-700'
+                  : isPrinting
+                  ? 'bg-slate-700 opacity-80 cursor-wait'
+                  : 'bg-slate-800 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600'
+              }`}
             >
-              <Printer className="w-4 h-4" />
-              <span>{isAr ? 'طباعة التقرير' : 'Print Report'}</span>
+              {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              <span>{isPrinting ? (isAr ? 'جاري التجهيز...' : 'Preparing...') : (isAr ? 'طباعة التقرير' : 'Print Report')}</span>
             </button>
 
-            {/* Download PDF Button */}
+            {/* Save Report (PDF) Button */}
             <button
               type="button"
               onClick={handleDownloadPdf}
               disabled={isExportingPdf}
-              title={isAr ? 'تحميل التقرير كملف PDF عالي الدقة' : 'Download High-Resolution PDF'}
+              title={isAr ? 'حفظ التقرير كملف PDF عالي الدقة' : 'Save Report as High-Resolution PDF'}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-bold text-xs sm:text-sm shadow-md transition cursor-pointer ${
                 exportSuccess
                   ? 'bg-emerald-600 text-white'
@@ -163,17 +189,17 @@ export const StockReportPage: React.FC<StockReportPageProps> = ({
               {isExportingPdf ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{isAr ? 'جاري التصدير...' : 'Exporting...'}</span>
+                  <span>{isAr ? 'جاري حفظ التقرير...' : 'Saving Report...'}</span>
                 </>
               ) : exportSuccess ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isAr ? 'تم التحميل!' : 'Downloaded!'}</span>
+                  <span>{isAr ? 'تم حفظ التقرير بنجاح!' : 'Report Saved!'}</span>
                 </>
               ) : (
                 <>
                   <FileDown className="w-4 h-4" />
-                  <span>{isAr ? 'تحميل PDF' : 'Download PDF'}</span>
+                  <span>{isAr ? 'حفظ التقرير (PDF)' : 'Save Report (PDF)'}</span>
                 </>
               )}
             </button>
@@ -221,7 +247,7 @@ export const StockReportPage: React.FC<StockReportPageProps> = ({
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer"
             >
               <FileDown className="w-4 h-4" />
-              <span>{isAr ? 'تحميل PDF' : 'Download PDF'}</span>
+              <span>{isAr ? 'حفظ التقرير (PDF)' : 'Save Report (PDF)'}</span>
             </button>
           </div>
         </div>

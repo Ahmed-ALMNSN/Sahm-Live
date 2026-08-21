@@ -208,18 +208,54 @@ export const FileUploadModal: React.FC<FileUploadModalProps> = ({
             </div>
           )}
 
-          {/* Error Display */}
+          {/* Error Display with Arabic Guidance */}
           {parseResult?.error && (
-            <div className="flex items-start gap-2.5 p-3 rounded bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-mono">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>{parseResult.error}</span>
+            <div className="p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 text-xs space-y-2">
+              <div className="flex items-start gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+                <span>{parseResult.error}</span>
+              </div>
+              <div className="p-2 rounded bg-rose-500/5 border border-rose-500/20 text-[11px] text-slate-700 dark:text-slate-300 font-mono">
+                <div className="font-bold text-rose-600 dark:text-rose-400 mb-1">
+                  {lang === 'ar' ? '📌 الأعمدة المطلوبة في ملف Excel / CSV:' : '📌 Required Columns in Excel / CSV:'}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 text-[11px]">
+                  <div>• <span className="font-bold text-slate-900 dark:text-white">Symbol</span> (رمز السهم)</div>
+                  <div>• <span className="font-bold text-slate-900 dark:text-white">UpperAlert</span> (الحد الأعلى)</div>
+                  <div>• <span className="font-bold text-slate-900 dark:text-white">LowerAlert</span> (الحد الأدنى)</div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Parse Result Summary & Preview */}
+          {/* Parse Result Summary, Column Match & Preview */}
           {parseResult && parseResult.success && (
             <div className="space-y-3">
               
+              {/* Detected Columns Mapping */}
+              {parseResult.detectedColumns && (
+                <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 text-xs font-mono">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 mb-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{lang === 'ar' ? 'تمت مطابقة أعمدة الملف بنجاح:' : 'Columns Matched Successfully:'}</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px] text-slate-700 dark:text-slate-300">
+                    <div className="flex items-center gap-1 bg-white dark:bg-[#0a0b0d] px-2 py-1 rounded border border-emerald-200 dark:border-emerald-800/30">
+                      <span className="text-emerald-600">✓ Symbol:</span>
+                      <span className="font-bold truncate">{parseResult.detectedColumns.symbolCol || 'رمز السهم'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white dark:bg-[#0a0b0d] px-2 py-1 rounded border border-emerald-200 dark:border-emerald-800/30">
+                      <span className="text-emerald-600">✓ UpperAlert:</span>
+                      <span className="font-bold truncate">{parseResult.detectedColumns.upperAlertCol || (lang === 'ar' ? 'اختياري' : 'Optional')}</span>
+                    </div>
+                    <div className="flex items-center gap-1 bg-white dark:bg-[#0a0b0d] px-2 py-1 rounded border border-emerald-200 dark:border-emerald-800/30">
+                      <span className="text-emerald-600">✓ LowerAlert:</span>
+                      <span className="font-bold truncate">{parseResult.detectedColumns.lowerAlertCol || (lang === 'ar' ? 'اختياري' : 'Optional')}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Summary Stats */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-2.5 rounded bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-slate-800 text-center">

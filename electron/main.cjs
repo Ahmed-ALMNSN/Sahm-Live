@@ -100,6 +100,58 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // IPC Handlers
+  ipcMain.handle('app:print', async (event, options = {}) => {
+    if (!mainWindow) return { success: false, error: 'No main window' };
+    return new Promise((resolve) => {
+      mainWindow.webContents.print(
+        {
+          silent: false,
+          printBackground: true,
+          deviceName: options.deviceName || '',
+          pageSize: 'A4',
+          margins: { marginType: 'custom', top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
+          ...options,
+        },
+        (success, failureReason) => {
+          resolve({ success, failureReason });
+        }
+      );
+    });
+  });
+
+  ipcMain.handle('app:save-pdf', async (event, options = {}) => {
+    if (!mainWindow) return { success: false, error: 'No main window' };
+    try {
+      const data = await mainWindow.webContents.printToPDF({
+        pageSize: 'A4',
+        printBackground: true,
+        margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
+      });
+      return { success: true, data: Buffer.from(data).toString('base64') };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.on('window:minimize', () => {
+    if (mainWindow) mainWindow.minimize();
+  });
+
+  ipcMain.on('window:maximize', () => {
+    if (mainWindow) {
+      if (mainWindow.isMaximized()) {
+        mainWindow.unmaximize();
+      } else {
+        mainWindow.maximize();
+      }
+    }
+  });
+
+  ipcMain.on('window:close', () => {
+    if (mainWindow) mainWindow.close();
+  });
+
   await startInternalServer();
   await createWindow();
 

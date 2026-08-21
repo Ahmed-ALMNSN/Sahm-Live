@@ -515,12 +515,23 @@ export function calculateStochasticRSI(closes: number[], rsiPeriod: number = 14,
  */
 export function runScientificAnalysis(
   stockData: any,
-  userConfig: Partial<QuantitativeConfig> = {}
+  userConfig?: Partial<QuantitativeConfig> | null
 ): QuantitativeAnalysisResult {
+  const safeConfig = (userConfig && typeof userConfig === 'object') ? userConfig : {};
+  const safeWeights: Partial<QuantitativeConfig['weights']> = 
+    (safeConfig.weights && typeof safeConfig.weights === 'object') ? safeConfig.weights : {};
+
   const config: QuantitativeConfig = {
     ...DEFAULT_CONFIG,
-    ...userConfig,
-    weights: { ...DEFAULT_CONFIG.weights, ...(userConfig.weights || {}) },
+    ...safeConfig,
+    weights: {
+      technicals: Number(safeWeights.technicals ?? DEFAULT_CONFIG.weights.technicals),
+      momentum: Number(safeWeights.momentum ?? DEFAULT_CONFIG.weights.momentum),
+      volumeLiquidity: Number(safeWeights.volumeLiquidity ?? DEFAULT_CONFIG.weights.volumeLiquidity),
+      fundamentals: Number(safeWeights.fundamentals ?? DEFAULT_CONFIG.weights.fundamentals),
+      catalyst: Number(safeWeights.catalyst ?? DEFAULT_CONFIG.weights.catalyst),
+      riskAdjusted: Number(safeWeights.riskAdjusted ?? DEFAULT_CONFIG.weights.riskAdjusted),
+    },
   };
 
   const sym = (stockData?.symbol || 'UNKNOWN').toUpperCase();

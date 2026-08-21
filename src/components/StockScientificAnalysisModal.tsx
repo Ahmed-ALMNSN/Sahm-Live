@@ -34,7 +34,8 @@ import {
   TrendingDown as BearishIcon,
   Calculator,
   Radio,
-  FileDown
+  FileDown,
+  Globe
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -66,6 +67,7 @@ import { ErrorBoundary } from './ErrorBoundary.js';
 import { TradingCalculator } from './TradingCalculator.js';
 import { StockIntradayDashboard } from './StockIntradayDashboard.js';
 import { ProfessionalPdfReportTemplate } from './ProfessionalPdfReportTemplate.js';
+import { MacroAnalysisCard } from './MacroAnalysisCard.js';
 import { ReportLoadingOverlay } from './ReportLoadingOverlay.js';
 import { ProfessionalReportData } from '../utils/reportEngine.js';
 import { executeReportGenerationFlow, ReportGenerationProgress } from '../utils/professionalPdfService.js';
@@ -80,7 +82,7 @@ interface StockScientificAnalysisModalProps {
   onOpenReportPage?: (report: ProfessionalReportData, stock: StockItem) => void;
 }
 
-type TabType = 'DASHBOARD' | 'DECISION' | 'CALCULATOR' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS';
+type TabType = 'DASHBOARD' | 'DECISION' | 'MACRO' | 'CALCULATOR' | 'CHARTS' | 'VOLUME' | 'FUNDAMENTALS' | 'DILUTION' | 'BACKTEST' | 'FACTORS' | 'ALERTS';
 
 export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModalProps> = ({
   stock,
@@ -215,7 +217,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
       }
     }
 
-    return runScientificAnalysis(mergedData, { weights: userWeights });
+    return runScientificAnalysis(mergedData, { weights: userWeights || DEFAULT_CONFIG.weights });
   }, [stock, fullData, userWeights]);
 
   // Active chart series based on selectedRange with fallback (Hook 15 - must be before any early return)
@@ -385,6 +387,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
           {[
             { id: 'DASHBOARD', label: isAr ? 'الداشبورد المباشر والشارت' : 'Live Dashboard & Charts', icon: <Radio className="w-4 h-4 text-emerald-500" /> },
             { id: 'DECISION', label: isAr ? 'القرار والاستشارة' : 'Advisory Decision', icon: <Target className="w-4 h-4" /> },
+            { id: 'MACRO', label: isAr ? 'المؤشرات الكلية (Macro)' : 'Macro Analysis', icon: <Globe className="w-4 h-4 text-sky-400" /> },
             { id: 'CALCULATOR', label: isAr ? 'حاسبة التداول والعمولات' : 'Trading Calculator', icon: <Calculator className="w-4 h-4" /> },
             { id: 'VOLUME', label: isAr ? 'الحجم والسرعة RVOL' : 'Volume & RVOL', icon: <Activity className="w-4 h-4" /> },
             { id: 'FUNDAMENTALS', label: isAr ? 'التحليل المالي والجودة' : 'Financial Quality', icon: <Building2 className="w-4 h-4" /> },
@@ -738,8 +741,32 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                   </div>
                 </div>
 
+                {/* Macroeconomic Side Dashboard in Advisory Decision */}
+                <div className="pt-2">
+                  <MacroAnalysisCard
+                    stock={stock}
+                    sector={fullData?.sector || stock.sector}
+                    lang={lang}
+                    theme={theme}
+                    mode="sidebar"
+                  />
+                </div>
+
               </div>
 
+            </div>
+          )}
+
+          {/* ===================== TAB: MACROECONOMIC & FED ANALYSIS ===================== */}
+          {activeTab === 'MACRO' && (
+            <div className="space-y-6">
+              <MacroAnalysisCard
+                stock={stock}
+                sector={fullData?.sector || stock.sector}
+                lang={lang}
+                theme={theme}
+                mode="full"
+              />
             </div>
           )}
 
@@ -1206,7 +1233,7 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                   {isAr ? 'تخصيص أوزان الحساب الرياضي' : 'Custom Weight Adjustments'}
                 </h3>
                 <div className="space-y-3 text-xs">
-                  {Object.entries(userWeights).map(([k, v]) => (
+                  {Object.entries(userWeights || DEFAULT_CONFIG.weights).map(([k, v]) => (
                     <div key={k} className="space-y-1">
                       <div className="flex justify-between text-slate-300">
                         <span className="capitalize">{k}</span>
@@ -1218,7 +1245,8 @@ export const StockScientificAnalysisModal: React.FC<StockScientificAnalysisModal
                         max={50}
                         value={v}
                         onChange={(e) => {
-                          const newW = { ...userWeights, [k]: parseInt(e.target.value, 10) };
+                          const currentW = userWeights || DEFAULT_CONFIG.weights;
+                          const newW = { ...currentW, [k]: parseInt(e.target.value, 10) };
                           setUserWeights(newW);
                         }}
                         className="w-full accent-emerald-500"

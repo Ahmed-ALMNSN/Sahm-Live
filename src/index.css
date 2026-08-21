@@ -22,12 +22,30 @@
     font-family: var(--font-cairo);
     font-size: 15px;
     line-height: 1.6;
-    letter-spacing: -0.01em;
     min-height: 100vh;
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
-  [dir="rtl"], [dir="ltr"] {
+  [dir="rtl"], [lang="ar"], .arabic-text {
+    font-family: var(--font-cairo);
+    letter-spacing: normal !important;
+    word-spacing: normal !important;
+    font-feature-settings: "liga" 1, "dlig" 1, "calt" 1, "kern" 1;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Prevent letter-spacing in RTL regardless of Tailwind tracking classes */
+  [dir="rtl"] .tracking-tighter,
+  [dir="rtl"] .tracking-tight,
+  [dir="rtl"] .tracking-normal,
+  [dir="rtl"] .tracking-wide,
+  [dir="rtl"] .tracking-wider,
+  [dir="rtl"] .tracking-widest {
+    letter-spacing: normal !important;
+  }
+
+  [dir="ltr"] {
     font-family: var(--font-cairo);
   }
 
@@ -111,8 +129,15 @@
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    letter-spacing: normal !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    -webkit-font-smoothing: antialiased !important;
+  }
+
+  * {
+    letter-spacing: normal !important;
+    font-feature-settings: "liga" 1, "dlig" 1, "calt" 1 !important;
   }
   
   nav, footer, .no-print, #btn-print, #btn-export-pdf, button, .toolbar, .no-print-area {

@@ -240,6 +240,37 @@ export interface DataSourcesInfo {
   reportGeneratedAtDateEn: string;
 }
 
+export interface MacroAnalysisReportData {
+  cpiYoY: number;
+  coreCpiYoY: number;
+  cpiMoM: number;
+  cpiTrendAr: string;
+  cpiTrendEn: string;
+  fedFundsTargetRange: string;
+  treasury10Y: number;
+  treasury2Y: number;
+  yieldCurveSpread: number;
+  yieldCurveStateAr: string;
+  yieldCurveStateEn: string;
+  realInterestRate: number;
+  policyStanceAr: string;
+  policyStanceEn: string;
+  dxyIndex: number;
+  crudeOilWti: number;
+  goldSpot: number;
+  stockMacroScore: number;
+  impactRatingAr: string;
+  impactRatingEn: string;
+  rateSensitivityAr: string;
+  inflationSensitivityAr: string;
+  tailwindsAr: string[];
+  tailwindsEn: string[];
+  headwindsAr: string[];
+  headwindsEn: string[];
+  summaryAr: string;
+  summaryEn: string;
+}
+
 export interface ProfessionalReportData {
   company: CompanyInfo;
   market: MarketMetrics;
@@ -251,6 +282,7 @@ export interface ProfessionalReportData {
   volume: VolumeLiquidityData;
   supportResistance: SupportResistanceData;
   risk: RiskAssessmentData;
+  macro?: MacroAnalysisReportData;
   tradingPlan: TradingPlanData;
   scenarios: MarketScenarios;
   invalidationConditions: {
@@ -894,7 +926,49 @@ export function generateProfessionalReport(
     reportGeneratedAtDateEn: dateEn,
   };
 
-  // 18. Generate mini chart data series
+  // 18. Macroeconomic & Monetary Policy Analysis
+  const macro: MacroAnalysisReportData = {
+    cpiYoY: 2.9,
+    coreCpiYoY: 3.2,
+    cpiMoM: 0.2,
+    cpiTrendAr: 'تباطؤ تدريجي (Disinflation)',
+    cpiTrendEn: 'Disinflationary Cooling',
+    fedFundsTargetRange: '4.25% - 4.50%',
+    treasury10Y: 4.28,
+    treasury2Y: 4.15,
+    yieldCurveSpread: 0.13,
+    yieldCurveStateAr: 'منحنى عائد طبيعي (Normal Curve)',
+    yieldCurveStateEn: 'Normal Yield Curve',
+    realInterestRate: 1.38,
+    policyStanceAr: 'فائدة حقيقية مقيدة مع ترقب قرارات الفيدرالي القادمة',
+    policyStanceEn: 'Restrictive real interest rate backdrop',
+    dxyIndex: 104.15,
+    crudeOilWti: 72.80,
+    goldSpot: 2885.50,
+    stockMacroScore: 25,
+    impactRatingAr: 'دعم كلي معتدل لبيئة التداول والنمو',
+    impactRatingEn: 'Moderate Macro Tailwind',
+    rateSensitivityAr: 'متوسطة الحساسية لأسعار الفائدة',
+    inflationSensitivityAr: 'حساسية منخفضة للتضخم المباشر',
+    tailwindsAr: [
+      'تباطؤ معدل التضخم الأمريكي العام إلى 2.9% يدعم سياسة الفيدرالي في تيسير الفائدة مستقبلاً.',
+      'استقرار مؤشر الدولار والسيولة الدولية يحد من الضغوط التمويلية.',
+    ],
+    tailwindsEn: [
+      'Cooling US headline CPI at 2.9% paves way for continued monetary policy normalization.',
+      'Stable USD liquidity index reduces cross-border capital pressures.',
+    ],
+    headwindsAr: [
+      'بقاء الفائدة الحقيقية أعلى من +1.0% يفرض انضباطاً في تسعير مضاعفات الأرباح.',
+    ],
+    headwindsEn: [
+      'Positive real interest rate (>1.0%) keeps discount rates disciplined.',
+    ],
+    summaryAr: `المؤشرات الاقتصادية الكلية لسهم ${company.symbol}: التضخم السنوي العام 2.9% وفائدة الفيدرالي 4.25%-4.50% وعائد سندات الـ 10 سنوات 4.28%. التأثير الكلي مصنف كـ "دعم كلي معتدل" بدرجة (+25/100).`,
+    summaryEn: `Macroeconomic climate for ${company.symbol}: CPI 2.9%, Fed Target 4.25%-4.50%, 10Y Yield 4.28%. Overall macro impact rating is Moderate Tailwind (+25/100).`,
+  };
+
+  // 19. Generate mini chart data series
   const chartDataSeries = [];
   const baseP = price * 0.95;
   for (let i = 0; i < 30; i++) {
@@ -923,6 +997,7 @@ export function generateProfessionalReport(
     volume,
     supportResistance,
     risk,
+    macro,
     tradingPlan,
     scenarios,
     invalidationConditions,

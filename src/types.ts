@@ -192,6 +192,17 @@ export interface ParsedStockData {
   brokerId?: string | null;
 }
 
+export interface DetectedColumnsInfo {
+  symbolCol?: string;
+  upperAlertCol?: string;
+  lowerAlertCol?: string;
+  companyCol?: string;
+  sectorCol?: string;
+  priceCol?: string;
+  buyPriceCol?: string;
+  sharesCol?: string;
+}
+
 export interface FileParseResult {
   success: boolean;
   stocks: ParsedStockData[];
@@ -202,6 +213,7 @@ export interface FileParseResult {
   ignoredCount: number;
   sheetNames?: string[];
   selectedSheet?: string;
+  detectedColumns?: DetectedColumnsInfo;
   error?: string;
 }
 

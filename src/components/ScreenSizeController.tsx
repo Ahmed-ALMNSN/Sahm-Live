@@ -95,7 +95,7 @@ export const ScreenSizeController: React.FC<ScreenSizeControllerProps> = ({
       {/* Dropdown Panel */}
       {isOpen && (
         <div 
-          className="absolute top-full mt-2 left-0 rtl:left-auto rtl:right-0 w-72 sm:w-80 bg-white dark:bg-[#161b22] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 p-4 font-sans text-slate-800 dark:text-slate-100 animate-slide-in"
+          className="absolute top-full mt-2 end-0 w-72 sm:w-80 max-w-[calc(100vw-24px)] bg-white dark:bg-[#161b22] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl z-50 p-4 font-sans text-slate-800 dark:text-slate-100 animate-slide-in"
           style={{ minWidth: '280px' }}
         >
           {/* Header */}

@@ -148,8 +148,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Logo & Market Badge */}
         <div className="flex items-center justify-between md:justify-start gap-3 sm:gap-5 w-full md:w-auto">
           <div className="flex items-center gap-2.5 sm:gap-3.5">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 bg-emerald-50 dark:bg-linear-to-br dark:from-[#122820] dark:to-[#0a1510] border border-emerald-500/40 rounded-xl flex items-center justify-center p-1.5 shadow-sm dark:shadow-md dark:shadow-emerald-950/40 shrink-0 group hover:border-emerald-500 transition-colors">
-              <BowArrowIcon className="w-full h-full text-emerald-600 dark:text-emerald-400 drop-shadow-xs group-hover:scale-105 transition-transform" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 bg-linear-to-br from-emerald-500/10 via-slate-100 to-emerald-500/5 dark:from-[#132d24] dark:via-[#0c1a14] dark:to-[#08100d] border border-emerald-500/40 dark:border-emerald-500/50 rounded-2xl flex items-center justify-center p-1.5 shadow-sm dark:shadow-lg dark:shadow-emerald-950/60 shrink-0 group hover:border-emerald-400 hover:shadow-emerald-500/20 transition-all duration-300 relative overflow-hidden">
+              <div className="absolute inset-0 bg-linear-to-tr from-emerald-500/0 via-white/10 to-emerald-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <BowArrowIcon className="w-full h-full text-emerald-600 dark:text-emerald-400 drop-shadow-sm group-hover:scale-110 transition-transform duration-300 relative z-10" />
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2" dir="ltr">
@@ -217,7 +218,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Action Tools & Controls */}
-        <div className="flex items-center justify-between md:justify-end flex-wrap gap-2 sm:gap-3 lg:gap-3.5 overflow-x-auto no-scrollbar pb-1 md:pb-0 w-full md:w-auto mt-1 md:mt-0">
+        <div className="flex items-center justify-between md:justify-end flex-wrap gap-1.5 sm:gap-2 lg:gap-2.5 w-full md:w-auto mt-1 md:mt-0">
           
           {/* Main Save / Commit Changes to Database Button */}
           <button
@@ -225,7 +226,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={onSaveAll}
             disabled={isSaving}
             title={hasUnsavedChanges ? t.actions.unsavedChanges : t.actions.saveTooltip}
-            className={`inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all shadow-sm shrink-0 active:scale-95 cursor-pointer relative ${
+            className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg transition-all shadow-xs shrink-0 active:scale-95 cursor-pointer relative ${
               hasUnsavedChanges
                 ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400 ring-offset-2 ring-offset-white dark:ring-offset-[#0f1115] shadow-md shadow-emerald-950/40 animate-pulse'
                 : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700'
@@ -238,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             )}
-            <span className="font-semibold">
+            <span className="font-semibold hidden xs:inline">
               {isSaving
                 ? t.actions.saving
                 : hasUnsavedChanges
@@ -250,16 +251,27 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </button>
 
+          {/* Quick Add Stock Button */}
+          <button
+            id="btn-add-stock"
+            onClick={onOpenAdd}
+            title={t.actions.addStock}
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white transition-all shadow-xs shrink-0 cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span className="hidden sm:inline">{t.actions.addStock}</span>
+          </button>
+
           {/* Trading Calculator Button */}
           {onOpenCalculator && (
             <button
               id="btn-open-calculator"
               onClick={onOpenCalculator}
               title={lang === 'ar' ? 'حاسبة التداول والعمولات' : 'Trading Calculator'}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-emerald-700/80 hover:bg-emerald-600 active:scale-95 text-white transition-all shadow-sm shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg bg-emerald-700/80 hover:bg-emerald-600 active:scale-95 text-white transition-all shadow-xs shrink-0 cursor-pointer"
             >
               <Calculator className="w-4 h-4" />
-              <span className="hidden xs:inline sm:inline">{lang === 'ar' ? 'الحاسبة' : 'Calculator'}</span>
+              <span className="hidden lg:inline">{lang === 'ar' ? 'الحاسبة' : 'Calculator'}</span>
             </button>
           )}
 
@@ -269,10 +281,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="btn-open-portfolio"
               onClick={onOpenPortfolio}
               title={lang === 'ar' ? 'المحفظة والمراكز' : 'Portfolio'}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer"
             >
               <Briefcase className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden sm:inline">{lang === 'ar' ? 'المحفظة' : 'Portfolio'}</span>
+              <span className="hidden lg:inline">{lang === 'ar' ? 'المحفظة' : 'Portfolio'}</span>
             </button>
           )}
 
@@ -281,21 +293,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             id="btn-open-report"
             onClick={onOpenReport}
             title={t.actions.printReport}
-            className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-95 text-white transition-all shadow-sm border border-sky-500/30 shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg bg-sky-600 hover:bg-sky-500 active:scale-95 text-white transition-all shadow-xs border border-sky-500/30 shrink-0 cursor-pointer"
           >
             <Printer className="w-4 h-4" />
-            <span className="hidden xs:inline sm:inline">{t.actions.printReport}</span>
-          </button>
-
-          {/* Quick Add Stock Button */}
-          <button
-            id="btn-add-stock"
-            onClick={onOpenAdd}
-            title={t.actions.addStock}
-            className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white transition-all shadow-sm shrink-0 cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>{t.actions.addStock}</span>
+            <span className="hidden lg:inline">{t.actions.printReport}</span>
           </button>
 
           {/* Quick Upload Button */}
@@ -303,10 +304,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             id="btn-upload-file"
             onClick={onOpenUpload}
             title={t.actions.uploadFile}
-            className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs sm:text-sm font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/90 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-all shrink-0 cursor-pointer"
           >
             <Upload className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-            <span className="hidden sm:inline">{t.actions.uploadFile}</span>
+            <span className="hidden xl:inline">{t.actions.uploadFile}</span>
           </button>
 
           {/* Refresh Interval Selector */}
@@ -316,18 +317,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={onManualRefresh}
               disabled={isRefreshing}
               title={t.actions.refreshNow}
-              className="p-1.5 sm:p-2 rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 active:scale-90 transition-all disabled:opacity-50 cursor-pointer"
+              className="p-1 sm:p-1.5 rounded text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 active:scale-90 transition-all disabled:opacity-50 cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRefreshing ? 'animate-spin text-emerald-500' : ''}`} />
             </button>
             <select
               id="select-refresh-interval"
               value={refreshInterval}
               onChange={(e) => onChangeRefreshInterval(Number(e.target.value))}
-              className="bg-transparent text-slate-700 dark:text-slate-300 font-mono text-xs sm:text-sm px-1.5 sm:px-2 py-1 outline-none cursor-pointer"
+              className="bg-transparent text-slate-700 dark:text-slate-300 font-mono text-xs px-1 sm:px-1.5 py-1 outline-none cursor-pointer"
             >
-              <option value={1000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">1s (Ultra)</option>
-              <option value={2000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">2s (Fast)</option>
+              <option value={1000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">1s</option>
+              <option value={2000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">2s</option>
               <option value={3000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">3s</option>
               <option value={5000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">5s</option>
               <option value={10000} className="bg-white dark:bg-[#161b22] text-slate-800 dark:text-slate-200">10s</option>
@@ -341,20 +342,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             id="btn-open-alerts-center"
             onClick={onOpenHistory}
             title={t.nav.alertsHistory}
-            className={`relative p-2 sm:p-2.5 rounded-lg border text-xs transition-all shrink-0 active:scale-95 shadow-xs cursor-pointer ${
+            className={`relative p-1.5 sm:p-2 rounded-lg border text-xs transition-all shrink-0 active:scale-95 shadow-xs cursor-pointer ${
               historyCount > 0
                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400'
                 : 'bg-slate-100 hover:bg-slate-200 dark:bg-[#0a0b0d] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             {historyCount > 0 ? (
-              <BellRing className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-amber-500 dark:text-amber-400 animate-pulse" />
+              <BellRing className="w-4 h-4 text-amber-500 dark:text-amber-400 animate-pulse" />
             ) : notificationPermission === 'granted' ? (
-              <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-emerald-600 dark:text-emerald-400" />
+              <Bell className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             ) : notificationPermission === 'denied' ? (
-              <BellOff className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-slate-400" />
+              <BellOff className="w-4 h-4 text-slate-400" />
             ) : (
-              <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-slate-500 dark:text-slate-300" />
+              <Bell className="w-4 h-4 text-slate-500 dark:text-slate-300" />
             )}
 
             {/* Unread Alert Count Badge */}
@@ -379,7 +380,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             id="btn-toggle-theme"
             onClick={onToggleTheme}
             title={theme === 'dark' ? t.nav.themeLight : t.nav.themeDark}
-            className="inline-flex items-center justify-center p-2 rounded-lg text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0a0b0d] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all shrink-0 active:scale-95 shadow-xs cursor-pointer"
+            className="inline-flex items-center justify-center p-1.5 sm:p-2 rounded-lg text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-[#0a0b0d] dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-all shrink-0 active:scale-95 shadow-xs cursor-pointer"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 text-amber-400" />
@@ -392,9 +393,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             id="btn-toggle-lang"
             onClick={onToggleLang}
-            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-bold font-mono bg-slate-100 hover:bg-slate-200 dark:bg-[#0a0b0d] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all shrink-0 shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold font-mono bg-slate-100 hover:bg-slate-200 dark:bg-[#0a0b0d] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all shrink-0 shadow-xs cursor-pointer"
           >
-            <Globe className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            <Globe className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
             <span>{lang === 'ar' ? 'EN' : 'العربية'}</span>
           </button>
 

@@ -19,6 +19,7 @@ import sys
 import time
 import json
 import socket
+import shutil
 import urllib.request
 import urllib.error
 import subprocess
@@ -51,6 +52,135 @@ ACCENT_RED = "#ef4444"
 TEXT_WHITE = "#f8fafc"
 TEXT_MUTED = "#94a3b8"
 BORDER_COLOR = "#30363d"
+
+
+def find_node_and_npm():
+    """
+    Search and resolve Node.js and NPM paths dynamically.
+    Ensures that when running via pythonw.exe or double-clicked .pyw,
+    Node.js and npm are located even if PATH was not inherited by the GUI process.
+    Also injects all found paths into os.environ['PATH'].
+    Returns (node_path, npm_path, version_str).
+    """
+    candidate_dirs = []
+
+    if os.name == 'nt':
+        # Standard Windows installation paths
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+        local_app_data = os.environ.get("LOCALAPPDATA", "")
+        app_data = os.environ.get("APPDATA", "")
+        user_profile = os.environ.get("USERPROFILE", "")
+
+        windows_paths = [
+            os.path.join(program_files, "nodejs"),
+            os.path.join(program_files_x86, "nodejs"),
+            os.path.join(local_app_data, "Programs", "nodejs") if local_app_data else "",
+            os.path.join(local_app_data, "Programs", "node") if local_app_data else "",
+            os.path.join(app_data, "npm") if app_data else "",
+            os.path.join(user_profile, "AppData", "Roaming", "npm") if user_profile else "",
+            os.path.join(user_profile, "AppData", "Local", "Programs", "nodejs") if user_profile else "",
+            os.path.join(user_profile, "AppData", "Local", "Programs", "node") if user_profile else "",
+            os.environ.get("NVM_HOME", ""),
+            os.environ.get("NVM_SYMLINK", ""),
+            os.path.join(user_profile, ".fnm", "current") if user_profile else "",
+            os.path.join(user_profile, ".volta", "bin") if user_profile else "",
+            r"C:\nodejs",
+            r"C:\node",
+            r"D:\nodejs",
+            r"D:\node",
+        ]
+        candidate_dirs.extend([p for p in windows_paths if p and os.path.isdir(p)])
+
+        # Check Windows Registry for Node.js install path
+        try:
+            import winreg
+            for root_key in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                for sub_key in (r"SOFTWARE\Node.js", r"SOFTWARE\WOW6432Node\Node.js"):
+                    try:
+                        with winreg.OpenKey(root_key, sub_key) as key:
+                            val, _ = winreg.QueryValueEx(key, "InstallPath")
+                            if val and os.path.isdir(val) and val not in candidate_dirs:
+                                candidate_dirs.insert(0, val)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    else:
+        # Linux / macOS standard paths
+        unix_paths = [
+            "/usr/local/bin",
+            "/usr/bin",
+            "/opt/homebrew/bin",
+            "/opt/local/bin",
+            os.path.expanduser("~/.nvm/versions/node"),
+            os.path.expanduser("~/.fnm/current/bin"),
+            os.path.expanduser("~/.volta/bin"),
+            os.path.expanduser("~/.bun/bin"),
+        ]
+        candidate_dirs.extend([p for p in unix_paths if os.path.isdir(p)])
+
+    # Inject all candidate directories into os.environ['PATH']
+    path_sep = ";" if os.name == 'nt' else ":"
+    current_paths = os.environ.get("PATH", "").split(path_sep)
+    for c_dir in candidate_dirs:
+        if c_dir and c_dir not in current_paths:
+            current_paths.insert(0, c_dir)
+    os.environ["PATH"] = path_sep.join(current_paths)
+
+    # Resolve node executable
+    node_path = shutil.which("node") or shutil.which("node.exe")
+    if not node_path:
+        for c_dir in candidate_dirs:
+            for node_name in ("node.exe", "node"):
+                test_file = os.path.join(c_dir, node_name)
+                if os.path.isfile(test_file):
+                    node_path = test_file
+                    break
+            if node_path:
+                break
+
+    # Resolve npm executable
+    npm_path = shutil.which("npm") or shutil.which("npm.cmd") or shutil.which("npm.exe")
+    if not npm_path:
+        for c_dir in candidate_dirs:
+            for npm_name in ("npm.cmd", "npm.bat", "npm.exe", "npm"):
+                test_file = os.path.join(c_dir, npm_name)
+                if os.path.isfile(test_file):
+                    npm_path = test_file
+                    break
+            if npm_path:
+                break
+
+    # If node is found but npm is not, check directory where node lives
+    if node_path and not npm_path:
+        node_dir = os.path.dirname(node_path)
+        for npm_name in ("npm.cmd", "npm.bat", "npm.exe", "npm"):
+            test_file = os.path.join(node_dir, npm_name)
+            if os.path.isfile(test_file):
+                npm_path = test_file
+                break
+
+    # Fallback names
+    if not npm_path:
+        npm_path = "npm.cmd" if os.name == 'nt' else "npm"
+
+    # Query node version
+    version_str = None
+    if node_path:
+        try:
+            res = subprocess.run([node_path, "--version"], capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                version_str = res.stdout.strip()
+        except Exception:
+            try:
+                res = subprocess.run(f'"{node_path}" --version', shell=True, capture_output=True, text=True, timeout=5)
+                if res.returncode == 0:
+                    version_str = res.stdout.strip()
+            except Exception:
+                pass
+
+    return node_path, npm_path, version_str
 
 
 def is_port_in_use(port: int) -> bool:
@@ -88,6 +218,9 @@ class StockMonitorApp:
         self.is_running = False
         self.installing = False
         self.log_lines = []
+        self.node_bin = None
+        self.npm_bin = None
+        self.node_version = None
 
         if self.root:
             self.setup_ui()
@@ -307,14 +440,15 @@ class StockMonitorApp:
         """Execute step-by-step launch workflow: check packages -> install if needed -> start server -> open browser."""
         self.append_log("بدء تشغيل منصة رصد الأسهم...")
 
-        # 1. Check Node.js / NPM existence
+        # 1. Check Node.js / NPM existence using smart discovery
         self.update_status("🔍 فحص بيئة Node.js و npm على الجهاز...", "فحص البيئة", "#f59e0b")
-        try:
-            subprocess.run(["node", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, cwd=str(APP_DIR))
-            subprocess.run(["npm", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, cwd=str(APP_DIR))
-            self.append_log("✅ تم العثور على Node.js و npm بنجاح.")
-        except Exception as e:
-            self.append_log("⚠️ تعذر العثور على Node.js في مسار النظام (PATH).")
+        node_bin, npm_bin, node_ver = find_node_and_npm()
+        self.node_bin = node_bin
+        self.npm_bin = npm_bin
+        self.node_version = node_ver
+
+        if not self.node_bin:
+            self.append_log("⚠️ تعذر العثور على Node.js في مسارات النظام أو المجلدات الافتراضية.")
             self.update_status("❌ Node.js غير مثبت على النظام. يرجى تثبيت Node.js للمتابعة.", "خطأ في البيئة", ACCENT_RED)
             if self.root:
                 self.root.after(0, lambda: messagebox.showerror(
@@ -322,6 +456,10 @@ class StockMonitorApp:
                     "يتطلب التطبيق وجود بيئة Node.js لتشغيل خادم التحليل.\nيرجى تنزيل وتثبيت Node.js من الموقع الرسمي:\nhttps://nodejs.org"
                 ))
             return
+
+        version_display = self.node_version if self.node_version else "متوفر"
+        self.append_log(f"✅ تم اكتشاف Node.js بنجاح ({version_display}) في: {self.node_bin}")
+        self.append_log(f"✅ تم تحديد مسار مدير الحزم npm: {self.npm_bin}")
 
         # 2. Check if npm install is already done
         if is_npm_installed_check():
@@ -332,12 +470,9 @@ class StockMonitorApp:
             self.update_status("📦 جاري تثبيت الحزم والمكتبات اللازمة لأول مرة (npm install)...", "جاري التنصيب", "#38bdf8")
             
             # Run npm install hidden with piped output
-            install_cmd = ["npm", "install"]
-            if os.name == 'nt':
-                # Windows hidden process flag
-                creationflags = subprocess.CREATE_NO_WINDOW
-            else:
-                creationflags = 0
+            install_cmd = [self.npm_bin, "install"]
+            is_win = os.name == 'nt'
+            creationflags = subprocess.CREATE_NO_WINDOW if is_win else 0
 
             try:
                 proc = subprocess.Popen(
@@ -346,6 +481,8 @@ class StockMonitorApp:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
+                    shell=is_win,
+                    env=os.environ.copy(),
                     creationflags=creationflags
                 )
                 for line in proc.stdout:
@@ -378,12 +515,10 @@ class StockMonitorApp:
         self.append_log(f"تشغيل الخادم في الخلفية على المنفذ {APP_PORT}...")
 
         # Determine start command
-        # Priority 1: `npm run dev` or `npx tsx server.ts`
-        cmd = ["npm", "run", "dev"]
-        if os.name == 'nt':
-            creationflags = subprocess.CREATE_NO_WINDOW
-        else:
-            creationflags = 0
+        npm_cmd = self.npm_bin or ("npm.cmd" if os.name == 'nt' else "npm")
+        cmd = [npm_cmd, "run", "dev"]
+        is_win = os.name == 'nt'
+        creationflags = subprocess.CREATE_NO_WINDOW if is_win else 0
 
         try:
             self.server_process = subprocess.Popen(
@@ -392,6 +527,8 @@ class StockMonitorApp:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                shell=is_win,
+                env=os.environ.copy(),
                 creationflags=creationflags
             )
             self.is_running = True
@@ -495,15 +632,23 @@ class StockMonitorApp:
         print("="*60)
         print("JMApps Stock Monitor - Headless Launcher")
         print("="*60)
+        node_bin, npm_bin, node_ver = find_node_and_npm()
+        if not node_bin:
+            print("ERROR: Node.js is not found on your system. Please install Node.js from https://nodejs.org")
+            return
+        
+        print(f"Node.js found: {node_bin} ({node_ver or 'OK'})")
+        npm_cmd = npm_bin or ("npm.cmd" if os.name == 'nt' else "npm")
+
         if not is_npm_installed_check():
             print("Installing dependencies via npm install...")
-            subprocess.run(["npm", "install"], cwd=str(APP_DIR), check=True)
+            subprocess.run([npm_cmd, "install"], cwd=str(APP_DIR), check=True, shell=(os.name == 'nt'), env=os.environ.copy())
         else:
             print("Dependencies verified. Skipping npm install.")
         
         print(f"Starting server on {SERVER_URL}...")
         webbrowser.open(SERVER_URL)
-        subprocess.run(["npm", "run", "dev"], cwd=str(APP_DIR))
+        subprocess.run([npm_cmd, "run", "dev"], cwd=str(APP_DIR), shell=(os.name == 'nt'), env=os.environ.copy())
 
 
 def main():
